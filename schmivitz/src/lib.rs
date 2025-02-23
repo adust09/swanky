@@ -22,3 +22,4 @@ mod proof;
 mod vole;
 
 pub use proof::Proof;
+pub use vole::RandomVole;
