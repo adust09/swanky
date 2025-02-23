@@ -5,14 +5,13 @@
 //! - Secure version as described in FAEST spec and paper
 //!
 
-pub(crate) mod insecure;
+pub mod insecure;
 
+use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 use eyre::Result;
 use merlin::Transcript;
 use rand::{CryptoRng, RngCore};
 use swanky_field_binary::{F128b, F2};
-
-use crate::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
 /// This defines the behavior needed to create and use non-interactive random VOLEs.
 ///
