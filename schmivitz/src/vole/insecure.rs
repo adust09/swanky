@@ -14,10 +14,9 @@ use swanky_field::{FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F8b, F2};
 
 use super::RandomVole;
-
+/// A struct representing an insecure VOLE implementation
 #[derive(Clone)]
-pub(crate) struct InsecureVole {
-    /// Number of VOLEs requested.
+pub struct InsecureVole {
     extended_witness_length: usize,
 
     /// Random values $`\bf u`$ that were committed to.
@@ -194,7 +193,8 @@ impl RandomVole for InsecureVole {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct InsecureCommitments {
+/// A struct representing the decommitment of an insecure VOLE
+pub struct InsecureCommitments {
     /// Number of VOLEs requested.
     extended_witness_length: usize,
 
@@ -211,7 +211,7 @@ pub(crate) struct InsecureCommitments {
 #[allow(unused)]
 impl InsecureCommitments {
     /// Validate that the partial decommitment is correctly formed with respect to itself.
-    pub(crate) fn validate_commitments(&self) -> Result<()> {
+    pub fn validate_commitments(&self) -> Result<()> {
         let expected_num_commitments =
             self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
         if self.verifier_commitments.len() != expected_num_commitments {
@@ -226,30 +226,30 @@ impl InsecureCommitments {
     }
 
     /// Get the length of the extended witness (e.g. the number of VOLEs requested).
-    pub(crate) fn extended_witness_length(&self) -> usize {
+    pub fn extended_witness_length(&self) -> usize {
         self.extended_witness_length
     }
 
     /// Get verifier key ($`\bf\Delta`$ in the paper).
-    pub(crate) fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
+    pub fn verifier_key_array(&self) -> &[F8b; REPETITION_PARAM] {
         &self.verifier_key
     }
 
     /// Get the lifted verifier key ($`\Delta`$ in the paper).
-    pub(crate) fn verifier_key(&self) -> F128b {
+    pub fn verifier_key(&self) -> F128b {
         F8b::form_superfield(&self.verifier_key.into())
     }
 
     /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
     ///
     /// The output is guaranteed to be [`Self::extended_witness_length()`].
-    pub(crate) fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
+    pub fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
         &self.verifier_commitments[0..self.extended_witness_length]
     }
 
     /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
     /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
-    pub(crate) fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+    pub fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
         // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
         // This will panic if we constructed the type with the wrong length.
         self.verifier_commitments
