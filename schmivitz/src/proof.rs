@@ -150,7 +150,10 @@ impl<Vole: RandomVole> Proof<Vole> {
         let expected_modulus = Number::from(FIELD_SIZE as u64);
         match header.types[..] {
             [Type::Field { modulus }] if modulus == expected_modulus => {}
-            _ => bail!("Invalid circuit: VOLE-in-the-head only supports elements in F_2"),
+            _ => bail!(
+                "Invalid circuit: VOLE-in-the-head only supports elements in F_{}",
+                FIELD_SIZE
+            ),
         }
 
         Ok(())
@@ -309,7 +312,7 @@ mod tests {
     fn header_cannot_include_plugins() {
         let plugin = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @plugin mux_v0;
             @begin
             @end ";
@@ -323,7 +326,7 @@ mod tests {
         // The conversion is from self->self because adding an extra type is a different failure case
         let trivial_conversion = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @convert(@out: 0:1, @in: 0:1);
             @begin
             @end ";
@@ -345,7 +348,7 @@ mod tests {
 
         let extra_field = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @type field 2305843009213693951;
             @begin
             @end ";
@@ -358,7 +361,7 @@ mod tests {
     fn tiny_header_works() -> eyre::Result<()> {
         let tiny_header = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @begin
             @end ";
         let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
@@ -401,7 +404,7 @@ mod tests {
     fn prove_doesnt_explode() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -409,7 +412,7 @@ mod tests {
             @end ";
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 128;
             @begin
                 < 1 >;
             @end";
@@ -422,7 +425,7 @@ mod tests {
 
     const SMALL_CIRCUIT: &str = "version 2.0.0;
         circuit;
-        @type field 2;
+        @type field 128;
         @begin
           $0 ... $4 <- @private(0);
           $5 <- @add(0: $0, $0);
@@ -441,7 +444,7 @@ mod tests {
     fn prove_works_on_slightly_larger_circuit() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 128;
             @begin
                 < 1 >;
                 < 1 >;
@@ -460,7 +463,7 @@ mod tests {
     fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
         private_input;
-        @type field 2;
+        @type field 128;
         @begin
             < 1 >;
             < 0 >;
@@ -486,7 +489,7 @@ mod tests {
         // Create a valid proof
         let small_circuit_bytes = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 128;
             @begin
               $0 ... $4 <- @private(0);
               $5 <- @add(0: $0, $0);
@@ -507,7 +510,7 @@ mod tests {
         let mut private_input = File::create(private_input_path.clone())?;
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 128;
             @begin
                 < 1 >;
                 < 0 >;
