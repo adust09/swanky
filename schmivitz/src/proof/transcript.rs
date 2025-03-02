@@ -2,7 +2,7 @@ use std::iter::repeat_with;
 
 use mac_n_cheese_sieve_parser::WireId;
 use swanky_field::FiniteRing;
-use swanky_field_binary::{F128b, F2};
+use swanky_field_binary::{F128b, F64b, F2};
 use swanky_serialization::CanonicalSerialize;
 
 use crate::parameters::{FIELD_SIZE, REPETITION_PARAM, SECURITY_PARAM, VOLE_SIZE_PARAM};
@@ -45,7 +45,7 @@ impl Transcript<'_> {
     /// This may require a new preprocessing pass for the verifier, in order to incorporate these
     /// before the initial witness commitment is generated.
     #[allow(unused)]
-    pub(crate) fn append_public_input(&mut self, wid: WireId, public_input: &F2) {
+    pub(crate) fn append_public_input(&mut self, wid: WireId, public_input: &F64b) {
         self.0
             .append_message(b"public input on wire id: wid", &wid.to_le_bytes());
         self.0
@@ -53,10 +53,10 @@ impl Transcript<'_> {
     }
 
     /// Adds the commitment to the witness to the transcript.
-    pub(crate) fn append_witness_commitment(&mut self, witness_commitment: &[F2]) {
+    pub(crate) fn append_witness_commitment(&mut self, witness_commitment: &[F64b]) {
         let bytes = witness_commitment
             .iter()
-            .flat_map(|f2| f2.to_bytes())
+            .flat_map(|f64b| f64b.to_bytes())
             .collect::<Vec<_>>();
         self.0
             .append_message(b"d: commitment to witness", bytes.as_slice());

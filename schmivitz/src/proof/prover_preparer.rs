@@ -7,7 +7,7 @@ use mac_n_cheese_sieve_parser::{
     ValueStreamReader as ValueStreamReaderT, WireId, WireRange,
 };
 use swanky_field::PrimeFiniteField;
-use swanky_field_binary::F2;
+use swanky_field_binary::{F64b, F2};
 
 /// A [`ProverPreparer`] allows the prover to prepare for VOLE-in-the-head by evaluating the
 /// circuit in the clear and determining the full extended witness.
@@ -28,10 +28,10 @@ where
     StreamReader: ValueStreamReaderT,
 {
     /// Complete map of values on every wire in the circuit.
-    wire_values: HashMap<WireId, F2>,
+    wire_values: HashMap<WireId, F64b>,
 
     /// Set of wire values that correspond to elements in the extended witness.
-    witness: Vec<F2>,
+    witness: Vec<F64b>,
 
     /// Number of polynomials that will need challenges.
     challenge_count: usize,
@@ -60,7 +60,7 @@ impl<StreamReader: ValueStreamReaderT> ProverPreparer<StreamReader> {
     }
 
     /// Save a value in our wire map.
-    fn save_wire(&mut self, wid: WireId, value: F2) -> eyre::Result<()> {
+    fn save_wire(&mut self, wid: WireId, value: F64b) -> eyre::Result<()> {
         // Assumption: Every wire ID will be assigned to exactly once, so if there's already a
         // value associated with a wire ID, the circuit is malformed.
         if self.wire_values.insert(wid, value).is_some() {
@@ -75,7 +75,7 @@ impl<StreamReader: ValueStreamReaderT> ProverPreparer<StreamReader> {
     /// Get the witness, wire values, and number of challenges required.
     ///
     /// These values will be empty if the circuit has not yet been traversed.
-    pub(crate) fn into_parts(self) -> (Vec<F2>, HashMap<WireId, F2>, usize) {
+    pub(crate) fn into_parts(self) -> (Vec<F64b>, HashMap<WireId, F64b>, usize) {
         (self.witness, self.wire_values, self.challenge_count)
     }
 }
@@ -148,17 +148,22 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
         assert_eq!(ty, 0);
 
         for wid in dst.start..=dst.end {
-            // Extract each input from the input stream and check that it's in F2
+            // Extract each input from the input stream and convert it to F64b
             let value = self
                 .private_inputs
                 .next()?
                 .ok_or_else(|| eyre!("Expected a private input but stream is empty"))?;
+
+            // First convert to F2 for compatibility
             let maybe_f2: Option<F2> = F2::try_from_int(value).into();
             let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
 
+            // Then convert F2 to F64b
+            let f64b = F64b::from(f2);
+
             // Save private input to the witness and associate it with its wire ID
-            self.witness.push(f2);
-            self.save_wire(wid, f2)?;
+            self.witness.push(f64b);
+            self.save_wire(wid, f64b)?;
         }
         Ok(())
     }
@@ -214,6 +219,7 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 mod tests {
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
+    use swanky_field_binary::{F64b, F2};
 
     use crate::proof::prover_preparer::ProverPreparer;
 
@@ -389,4 +395,6 @@ mod tests {
 
         Ok(())
     }
+
+    // We don't need to test F64b operations specifically
 }

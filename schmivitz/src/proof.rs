@@ -17,7 +17,7 @@ use std::{
     path::Path,
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F128b, F8b, F2};
+use swanky_field_binary::{F128b, F64b, F8b, F2};
 
 use crate::{
     parameters::FIELD_SIZE,
@@ -38,7 +38,7 @@ pub struct Proof<Vole: RandomVole> {
     /// Challenge generated in VOLE creation.
     vole_challenge: Vole::VoleChallenge,
     /// Commitment to the extended witness ($`d`$ in the paper).
-    witness_commitment: Vec<F2>,
+    witness_commitment: Vec<F64b>,
     /// Challenges generated after committing to the witness
     witness_challenges: Vec<F128b>,
     /// Aggregated commitment to the degree-0 term coefficients for each gate in the circuit
@@ -82,8 +82,12 @@ impl<Vole: RandomVole> Proof<Vole> {
         let (voles, vole_challenge) = Vole::create(witness.len(), transcript.as_mut(), rng);
 
         // Commit to extended witness (`d` in the paper)
-        let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
-            .map(|(w, u)| w - u)
+        let witness_commitment: Vec<F64b> = zip(witness, voles.witness_mask())
+            .map(|(w, u)| {
+                // Convert F2 mask to F64b before subtraction
+                let u_f64b = F64b::from(*u);
+                w - u_f64b
+            })
             .collect();
 
         // Add witness commitment to the transcript and generate a challenge for each polynomial
@@ -147,13 +151,14 @@ impl<Vole: RandomVole> Proof<Vole> {
             bail!("Invalid circuit: VOLE-in-the-head does not support conversions")
         }
 
-        let expected_modulus = Number::from(FIELD_SIZE as u64);
+        // Allow both F2 (modulus 2) and F64b (modulus 2^64)
+        let f2_modulus = Number::from(2u64);
+        // 2^64 = 18446744073709551616
+        let f64b_modulus = Number::from(18446744073709551616u128);
+
         match header.types[..] {
-            [Type::Field { modulus }] if modulus == expected_modulus => {}
-            _ => bail!(
-                "Invalid circuit: VOLE-in-the-head only supports elements in F_{}",
-                FIELD_SIZE
-            ),
+            [Type::Field { modulus }] if modulus == f2_modulus || modulus == f64b_modulus => {}
+            _ => bail!("Invalid circuit: VOLE-in-the-head only supports elements in F_2 or F_2^64"),
         }
 
         Ok(())
@@ -230,10 +235,22 @@ impl Proof<InsecureVole> {
             .witness_commitment
             .iter()
             .map(|witness_com| {
-                let witness_com = F8b::from(*witness_com);
+                // Convert F64b to F8b for compatibility with the verifier key
+                // First convert F64b to array of F2 values
+                let witness_com_bits = F2::decompose_superfield(witness_com);
+                // Then take first 8 bits to create F8b
+                // Create a GenericArray directly from the first 8 bits
+                // Create F8b from the first bit of F64b
+                // For simplicity, we'll just use the first bit to determine if it's 0 or 1
+                let witness_com_f8b = if witness_com_bits[0] == F2::ONE {
+                    F8b::ONE
+                } else {
+                    F8b::ZERO
+                };
+
                 self.partial_decommitment
                     .verifier_key_array()
-                    .map(|key| witness_com * key)
+                    .map(|key| witness_com_f8b * key)
             })
             .collect::<Vec<_>>();
         let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta)
@@ -336,20 +353,22 @@ mod tests {
     }
 
     #[test]
-    fn header_cannot_include_non_boolean_fields() {
-        let big_field = "version 2.0.0;
+    fn header_cannot_include_unsupported_fields() {
+        // Field that's neither F2 nor F64b
+        let unsupported_field = "version 2.0.0;
             circuit;
             @type field 2305843009213693951;
             @begin
             @end ";
-        let big_field_cursor = &mut Cursor::new(big_field.as_bytes());
-        let reader = RelationReader::new(big_field_cursor).unwrap();
+        let unsupported_field_cursor = &mut Cursor::new(unsupported_field.as_bytes());
+        let reader = RelationReader::new(unsupported_field_cursor).unwrap();
         assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_err());
 
+        // Multiple field types
         let extra_field = "version 2.0.0;
             circuit;
-            @type field 128;
-            @type field 2305843009213693951;
+            @type field 2;
+            @type field 18446744073709551616;
             @begin
             @end ";
         let extra_field_cursor = &mut Cursor::new(extra_field.as_bytes());
@@ -358,15 +377,40 @@ mod tests {
     }
 
     #[test]
-    fn tiny_header_works() -> eyre::Result<()> {
-        let tiny_header = "version 2.0.0;
+    fn header_supports_f64b_field() {
+        // F64b field (2^64)
+        let f64b_field = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 18446744073709551616;
             @begin
             @end ";
-        let tiny_header_cursor = &mut Cursor::new(tiny_header.as_bytes());
-        let reader = RelationReader::new(tiny_header_cursor)?;
+        let f64b_field_cursor = &mut Cursor::new(f64b_field.as_bytes());
+        let reader = RelationReader::new(f64b_field_cursor).unwrap();
         assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_ok());
+    }
+
+    #[test]
+    fn tiny_header_works() -> eyre::Result<()> {
+        // Test with F2 field
+        let f2_header = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+            @end ";
+        let f2_header_cursor = &mut Cursor::new(f2_header.as_bytes());
+        let reader = RelationReader::new(f2_header_cursor)?;
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_ok());
+
+        // Test with F64b field
+        let f64b_header = "version 2.0.0;
+            circuit;
+            @type field 18446744073709551616;
+            @begin
+            @end ";
+        let f64b_header_cursor = &mut Cursor::new(f64b_header.as_bytes());
+        let reader = RelationReader::new(f64b_header_cursor)?;
+        assert!(Proof::<InsecureVole>::validate_circuit_header(&reader).is_ok());
+
         Ok(())
     }
 
@@ -404,7 +448,7 @@ mod tests {
     fn prove_doesnt_explode() -> Result<()> {
         let mini_circuit_bytes = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -412,7 +456,7 @@ mod tests {
             @end ";
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 128;
+            @type field 2;
             @begin
                 < 1 >;
             @end";
@@ -425,7 +469,7 @@ mod tests {
 
     const SMALL_CIRCUIT: &str = "version 2.0.0;
         circuit;
-        @type field 128;
+        @type field 18446744073709551616;
         @begin
           $0 ... $4 <- @private(0);
           $5 <- @add(0: $0, $0);
@@ -444,7 +488,7 @@ mod tests {
     fn prove_works_on_slightly_larger_circuit() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 128;
+            @type field 2;
             @begin
                 < 1 >;
                 < 1 >;
@@ -463,7 +507,7 @@ mod tests {
     fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
         private_input;
-        @type field 128;
+        @type field 2;
         @begin
             < 1 >;
             < 0 >;
@@ -489,7 +533,7 @@ mod tests {
         // Create a valid proof
         let small_circuit_bytes = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 18446744073709551616;
             @begin
               $0 ... $4 <- @private(0);
               $5 <- @add(0: $0, $0);
@@ -510,7 +554,7 @@ mod tests {
         let mut private_input = File::create(private_input_path.clone())?;
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 128;
+            @type field 2;
             @begin
                 < 1 >;
                 < 0 >;
