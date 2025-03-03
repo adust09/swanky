@@ -15,7 +15,7 @@ use swanky_field_binary::{F128b, F8b, F2};
 
 use super::RandomVole;
 /// A struct representing an insecure VOLE implementation
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InsecureVole {
     extended_witness_length: usize,
 
