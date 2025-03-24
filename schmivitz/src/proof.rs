@@ -20,7 +20,6 @@ use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F64b, F8b, F2};
 
 use crate::{
-    parameters::FIELD_SIZE,
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
     vole::{insecure::InsecureVole, RandomVole},
 };
