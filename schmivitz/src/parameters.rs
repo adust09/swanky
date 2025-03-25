@@ -20,7 +20,7 @@ pub const SECURITY_PARAM: usize = 128;
 /// Section 6.2 actually allows the input polynomials to be defined over an extension field
 /// $`\mathbb F_{p^k}`$, for some $`k`$. For ease of implementation, we restrict the input
 /// polynomials to be over $`\mathbb F_p`$.
-pub const FIELD_SIZE: usize = 128;
+pub const FIELD_SIZE: u128 = 18446744073709551615;
 
 /// The field size ($`r`$ in the paper) for the generated VOLEs, relative to [`FIELD_SIZE`].
 ///
