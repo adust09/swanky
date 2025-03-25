@@ -5,8 +5,8 @@ use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
-use swanky_field::{FiniteRing, IsSubFieldOf};
-use swanky_field_binary::{F128b, F64b, F2};
+use swanky_field::FiniteRing;
+use swanky_field_binary::{F128b, F2};
 
 use crate::vole::RandomVole;
 
@@ -22,7 +22,7 @@ pub(crate) struct ProverTraverser<Vole> {
     /// contain the input wires for multiplication gates, but the current structure of the
     /// [`ProverPreparer`](crate::proof::prover_preparer::ProverPreparer) will produce
     /// the full set of wire values.
-    wire_values: HashMap<WireId, F64b>,
+    wire_values: HashMap<WireId, F2>,
     /// Fiat-Shamir challenges. There should be one for each polynomial (e.g. non-linear gate).
     challenges: Vec<F128b>,
 
@@ -60,7 +60,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     ///   corresponding to every gate in the extended witness.
     #[allow(unused)]
     pub(crate) fn new(
-        wire_values: HashMap<WireId, F64b>,
+        wire_values: HashMap<WireId, F2>,
         challenges: Vec<F128b>,
         voles: Vole,
     ) -> Result<Self> {
@@ -92,7 +92,7 @@ impl<Vole: RandomVole> ProverTraverser<Vole> {
     /// Retrieve the wire value associated with the [`WireId`].
     ///
     /// Fails if the wire value map provided by the caller does not contain the given ID.
-    fn wire_value(&self, wid: WireId) -> Result<F64b> {
+    fn wire_value(&self, wid: WireId) -> Result<F2> {
         self.wire_values
             .get(&wid)
             .ok_or_else(|| {
@@ -240,27 +240,9 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
         // Compute coefficient values `A_i1` and `A_i0` (respectively). These are derived from the
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = self.vole(left)? * self.vole(right)?;
-
-        // Convert F64b to F128b for multiplication
-        // First convert to F2 bits, then to F128b
-        let right_bits = F2::decompose_superfield(&self.wire_value(right)?);
-        let left_bits = F2::decompose_superfield(&self.wire_value(left)?);
-
-        // Create F128b values from the bits (1 if bit is set, 0 otherwise)
-        let wire_value_right_f128b = if right_bits[0] == F2::ONE {
-            F128b::ONE
-        } else {
-            F128b::ZERO
-        };
-        let wire_value_left_f128b = if left_bits[0] == F2::ONE {
-            F128b::ONE
-        } else {
-            F128b::ZERO
-        };
-
-        let degree_1_coeff = wire_value_right_f128b * self.vole(left)?
-            + wire_value_left_f128b * self.vole(right)?
-            - self.vole(dst)?;
+        let degree_1_coeff = self.wire_value(right)? * self.vole(left)?
+            + self.wire_value(left)? * self.vole(right)?;
+        -self.vole(dst)?;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
@@ -355,7 +337,7 @@ mod tests {
     use merlin::Transcript;
     use rand::{thread_rng, Rng};
     use swanky_field::FiniteRing;
-    use swanky_field_binary::{F128b, F64b, F2};
+    use swanky_field_binary::{F128b, F2};
 
     use crate::vole::{insecure::InsecureVole, RandomVole};
 
@@ -367,7 +349,7 @@ mod tests {
 
         let (voles, _) = InsecureVole::create(len, transcript, rng);
         let challenges = repeat_with(|| F128b::random(rng)).take(len).collect();
-        let wire_ids = repeat_with(|| (rng.gen(), F64b::from(F2::random(rng)))).take(len);
+        let wire_ids = repeat_with(|| (rng.gen(), F2::from(F2::random(rng)))).take(len);
         ProverTraverser::new(HashMap::from_iter(wire_ids), challenges, voles).unwrap()
     }
 
