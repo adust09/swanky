@@ -156,7 +156,7 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
 
             // First convert to F2 for compatibility
             let maybe_f2: Option<F2> = F2::try_from_int(value).into();
-            let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+            let f2 = maybe_f2.unwrap();
 
             // Then convert F2 to F64b
             let f64b = F64b::from(f2);
