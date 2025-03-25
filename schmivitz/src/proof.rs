@@ -311,7 +311,7 @@ mod tests {
     fn header_cannot_include_plugins() {
         let plugin = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 2;
             @plugin mux_v0;
             @begin
             @end ";
@@ -325,7 +325,7 @@ mod tests {
         // The conversion is from self->self because adding an extra type is a different failure case
         let trivial_conversion = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 2;
             @convert(@out: 0:1, @in: 0:1);
             @begin
             @end ";
@@ -347,7 +347,7 @@ mod tests {
 
         let extra_field = "version 2.0.0;
             circuit;
-            @type field 128;
+            @type field 2;
             @type field 2305843009213693951;
             @begin
             @end ";
