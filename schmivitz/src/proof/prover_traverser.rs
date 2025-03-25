@@ -241,8 +241,8 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
         // `c_i(X)` polynomial defined in the paper -- see Fig 7 and page 32-33 for details.
         let degree_0_coeff = self.vole(left)? * self.vole(right)?;
         let degree_1_coeff = self.wire_value(right)? * self.vole(left)?
-            + self.wire_value(left)? * self.vole(right)?;
-        -self.vole(dst)?;
+            + self.wire_value(left)? * self.vole(right)?
+            - self.vole(dst)?;
 
         self.aggregate_degree_0 += challenge * degree_0_coeff;
         self.aggregate_degree_1 += challenge * degree_1_coeff;
