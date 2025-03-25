@@ -2,7 +2,7 @@
 //!
 //! This records all the fixed parameters we've chosen. Some of these may not be used directly in
 //! the protocol execution, but we record them for posterity. We also fix the following parameters:
-//! - The small-domain paramter $`S_\Delta`$ for the sVOLE functionality is set to $`\mathbb F_q`$
+//! - The small-domain parameter $`S_\Delta`$ for the sVOLE functionality is set to $`\mathbb F_q`$
 //!   where [$`q`$ is the VOLE field size](VOLE_SIZE_PARAM).
 //! - The leakage parameter $`\mathcal L`$ for the sVOLE functionality is set to
 //!   $`\{2^{S_\Delta}\}`$, which does not permit any leakage (see Baum et al., Section 5.1).
@@ -20,7 +20,7 @@ pub const SECURITY_PARAM: usize = 128;
 /// Section 6.2 actually allows the input polynomials to be defined over an extension field
 /// $`\mathbb F_{p^k}`$, for some $`k`$. For ease of implementation, we restrict the input
 /// polynomials to be over $`\mathbb F_p`$.
-pub const FIELD_SIZE: u128 = 18446744073709551615;
+pub const FIELD_SIZE: u128 = 18446744073709551616;
 
 /// The field size ($`r`$ in the paper) for the generated VOLEs, relative to [`FIELD_SIZE`].
 ///

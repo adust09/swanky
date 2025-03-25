@@ -366,7 +366,7 @@ mod tests {
         // Multiple field types
         let extra_field = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @type field 18446744073709551616;
             @begin
             @end ";
@@ -393,7 +393,7 @@ mod tests {
         // Test with F2 field
         let f2_header = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
             @end ";
         let f2_header_cursor = &mut Cursor::new(f2_header.as_bytes());
@@ -455,7 +455,7 @@ mod tests {
             @end ";
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
                 < 1 >;
             @end";
@@ -487,7 +487,7 @@ mod tests {
     fn prove_works_on_slightly_larger_circuit() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
                 < 1 >;
                 < 1 >;
@@ -506,7 +506,7 @@ mod tests {
     fn prover_and_verifier_must_input_the_same_transcript() -> Result<()> {
         let private_input_bytes = "version 2.0.0;
         private_input;
-        @type field 2;
+        @type field 18446744073709551616;
         @begin
             < 1 >;
             < 0 >;
@@ -553,7 +553,7 @@ mod tests {
         let mut private_input = File::create(private_input_path.clone())?;
         let private_input_bytes = "version 2.0.0;
             private_input;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
                 < 1 >;
                 < 0 >;

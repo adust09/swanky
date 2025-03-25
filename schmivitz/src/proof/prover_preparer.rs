@@ -219,7 +219,6 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 mod tests {
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
-    use swanky_field_binary::{F64b, F2};
 
     use crate::proof::prover_preparer::ProverPreparer;
 
@@ -272,7 +271,7 @@ mod tests {
     fn private_inputs_count_correctly() -> eyre::Result<()> {
         let private_input_only = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @private(0);
@@ -283,7 +282,7 @@ mod tests {
 
         let private_input_range = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 ... $3 <- @private(0);
             @end";
@@ -296,7 +295,7 @@ mod tests {
     fn multiplication_gates_count_correctly() -> eyre::Result<()> {
         let one_mul = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -306,7 +305,7 @@ mod tests {
 
         let many_mul = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -327,7 +326,7 @@ mod tests {
         // extra `@add` thrown in.
         let one_mul = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -338,7 +337,7 @@ mod tests {
 
         let many_mul = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @mul(0: $0, $0);
@@ -358,7 +357,7 @@ mod tests {
     fn add_gates_eval_correctly() -> eyre::Result<()> {
         let one_add = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @private(0);
@@ -379,7 +378,7 @@ mod tests {
     fn mul_gates_eval_correctly() -> eyre::Result<()> {
         let one_mul = "version 2.0.0;
             circuit;
-            @type field 2;
+            @type field 18446744073709551616;
             @begin
               $0 <- @private(0);
               $1 <- @private(0);
