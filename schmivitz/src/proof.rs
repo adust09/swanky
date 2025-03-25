@@ -83,13 +83,8 @@ impl<Vole: RandomVole> Proof<Vole> {
 
         // Commit to extended witness (`d` in the paper)
         let witness_commitment: Vec<F2> = zip(witness, voles.witness_mask())
-            .map(|(w, u)| {
-                // Convert F2 mask to F64b before subtraction
-                let u_f64b = F2::from(*u);
-                w - u_f64b
-            })
+            .map(|(w, u)| w - u)
             .collect();
-
         // Add witness commitment to the transcript and generate a challenge for each polynomial
         transcript.append_witness_commitment(witness_commitment.as_slice());
         let witness_challenges = transcript.extract_witness_challenges(challenge_count);
