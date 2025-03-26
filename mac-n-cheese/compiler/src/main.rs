@@ -9,6 +9,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static ALLOC: dhat::Alloc = dhat::Alloc;*/
 
 mod aes_example;
+mod keccak_example;
 mod sieve_compiler;
 
 #[derive(Parser)]
