@@ -127,6 +127,7 @@ fn parse_circuit() -> Circuit {
 }
 
 // Keccak-f[1600] function (simplified)
+// TODO: Implement the actual Keccak-f[1600] function
 fn do_keccak(state: &mut [bool; NUM_INPUTS]) {
     // In a real implementation, you would:
     // 1. Convert the boolean array to Keccak state (5x5x64 bits)

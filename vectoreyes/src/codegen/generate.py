@@ -5,7 +5,7 @@ import sys
 from itertools import product, takewhile
 from pathlib import Path
 
-import jinja2
+import jinja2 # type: ignore
 
 CODEGEN = Path(__file__).resolve().parent
 
@@ -166,4 +166,8 @@ def generate():
             env.get_template("tests/vector.tmpl").render(ty=ty),
         )
     write_rust("tests.rs", env.get_template("tests.tmpl").render())
+    
+    # Generate Keccak implementation from template
+    write_rust("keccak.rs", env.get_template("impl/keccak.tmpl").render())
+    
     return out
