@@ -1,0 +1,16 @@
+{
+    "name": "Swanky Development",
+    "dockerFile": "Dockerfile",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml",
+                "serayuzgur.crates"
+            ]
+        }
+    },
+    "forwardPorts": [],
+    "postCreateCommand": "sh .devcontainer/post-create.sh",
+    "remoteUser": "vscode"
+} 
