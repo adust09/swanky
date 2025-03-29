@@ -83,10 +83,14 @@ if __name__ == "__main__":
             env_cache.parent.mkdir(parents=True, exist_ok=True)
             # First, we setup a GC root for nix, so that it won't try to garbage collect the
             # swanky nix environment while we're running it.
+            # Get the Nix file to use, defaulting to cli.nix
+            nix_file = os.environ.get("SWANKY_NIX_FILE", "cli.nix")
+            print(f"Using Nix configuration: {nix_file}")
+            
             subprocess.check_call(
                 [
                     "nix-build",
-                    str(ROOT / "etc" / "nix" / "cli.nix"),
+                    str(ROOT / "etc" / "nix" / nix_file),
                     "-A",
                     "inputDerivation",
                     "-o",
@@ -97,11 +101,14 @@ if __name__ == "__main__":
             )
             env = dict()
             # env --null is a command which emits b'\0' seperated KEY=VALUE pairs.
+            # Use the same nix file as for nix-build
+            nix_file = os.environ.get("SWANKY_NIX_FILE", "cli.nix")
+            
             for entry in subprocess.check_output(
                 [
                     "nix-shell",
                     "--pure",
-                    str(ROOT / "etc" / "nix" / "cli.nix"),
+                    str(ROOT / "etc" / "nix" / nix_file),
                     "--run",
                     "exec env --null",
                 ]

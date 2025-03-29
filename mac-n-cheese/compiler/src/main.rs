@@ -9,6 +9,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static ALLOC: dhat::Alloc = dhat::Alloc;*/
 
 mod aes_example;
+mod keccak_example;
 mod sieve_compiler;
 
 #[derive(Parser)]
@@ -23,6 +24,7 @@ struct Cli {
 enum Commands {
     /// Compile the AES example benchmark.
     CompileAesBenchmark(aes_example::AesArgs),
+    CompileKeccakBenchmark(keccak_example::KeccakArgs),
     CompileSieve(sieve_compiler::SieveArgs),
 }
 
@@ -48,6 +50,7 @@ fn main() -> eyre::Result<()> {
     setup_panic_handler();
     match Cli::parse().command {
         Commands::CompileAesBenchmark(args) => aes_example::aes_main(args),
+        Commands::CompileKeccakBenchmark(args) => keccak_example::keccak_main(args),
         Commands::CompileSieve(args) => sieve_compiler::sieve_compiler_main(args),
     }
 }
