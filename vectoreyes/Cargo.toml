@@ -19,6 +19,7 @@ serde.workspace = true
 rand.workspace = true
 aes.workspace = true
 lazy_static.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 aes.workspace = true

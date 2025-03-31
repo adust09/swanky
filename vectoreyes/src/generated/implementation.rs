@@ -5721,7 +5721,9 @@ pub const LANE_SIZE: usize = 8; // 64 bits = 8 bytes
 pub const NUM_ROUNDS: usize = 24;
 #[doc = "Delimiters for different SHA-3 variants"]
 pub const SHA3_DELIMITER: u8 = 0x06;
+#[doc = "Delimiters for SHAKE variants"]
 pub const SHAKE_DELIMITER: u8 = 0x1F;
+#[doc = "Delimiters for cSHAKE variants"]
 pub const CSHAKE_DELIMITER: u8 = 0x04;
 #[doc = "Rate for SHA3-224 in bytes"]
 pub const SHA3_224_RATE: usize = 144; // 1152 bits
