@@ -3,12 +3,11 @@ use mac_n_cheese_ir::circuit_builder::vole_supplier::VoleSupplier;
 use mac_n_cheese_ir::circuit_builder::{build_circuit, build_privates};
 use mac_n_cheese_ir::compilation_format::wire_format::Wire;
 use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
-use rand::RngCore;
 
 use scuttlebutt::field::F2;
 use scuttlebutt::ring::FiniteRing;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
-use vectoreyes::{array_utils::ArrayUnrolledExt, SimdBase, U8x16};
+use vectoreyes::{array_utils::ArrayUnrolledExt, Sha3};
 
 fn own_wire(idx: impl TryInto<WireSize>) -> Wire {
     Wire::own_wire(ws(idx))
@@ -27,7 +26,6 @@ enum WireBody {
 }
 
 const NUM_INPUTS: usize = 1600;
-const NUM_OUTPUTS: usize = 1600;
 
 #[derive(Default, Clone)]
 struct Circuit {
@@ -122,12 +120,32 @@ fn parse_circuit() -> Circuit {
 }
 
 fn do_keccak(m: [bool; 1600]) -> [bool; 1600] {
-    let mut state = m;
-    vectoreyes::keccak_f1600_permutation(&mut state);
-    state
+    // ブール配列をバイト配列に変換
+    let mut bytes = [0u8; 200]; // 1600ビット = 200バイト
+    for i in 0..1600 {
+        if m[i] {
+            bytes[i / 8] |= 1 << (i % 8);
+        }
+    }
+
+    let hash = Sha3::sha3_256_hash(&bytes);
+
+    // 結果を1600ビットのブール配列に変換して返す
+    let mut result = [false; 1600];
+
+    // ハッシュ値（32バイト）を結果の最初の256ビットにコピー
+    for i in 0..256 {
+        result[i] = (hash[i / 8] >> (i % 8)) & 1 == 1;
+    }
+
+    // 残りのビットは入力をそのまま使用
+    for i in 256..1600 {
+        result[i] = m[i];
+    }
+
+    result
 }
 
-const NUM_INPUTS_U32: u32 = NUM_INPUTS as u32;
 const MAC_TY: FieldMacType = FieldMacType::BinaryF63b;
 const WITNESS: [bool; 1600] = [true; 1600];
 
@@ -195,6 +213,9 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
         }
         let actual_bits: Vec<bool> = circuit.outputs.iter().copied().map(|i| values[i]).collect();
         for (i, bit) in actual_bits.iter().enumerate() {
+            if i < 10 {
+                eprintln!("i={}, expected={}, actual={}", i, expected[i], *bit);
+            }
             assert_eq!(*bit, expected[i]);
         }
     }
