@@ -120,8 +120,8 @@ fn parse_circuit() -> Circuit {
 }
 
 fn do_keccak(m: [bool; 1600]) -> [bool; 1600] {
-    // ブール配列をバイト配列に変換
-    let mut bytes = [0u8; 200]; // 1600ビット = 200バイト
+    // Convert the input to bytes
+    let mut bytes = [0u8; 200]; // 1600bit = 200Byte
     for i in 0..1600 {
         if m[i] {
             bytes[i / 8] |= 1 << (i % 8);
@@ -130,15 +130,14 @@ fn do_keccak(m: [bool; 1600]) -> [bool; 1600] {
 
     let hash = Sha3::sha3_256_hash(&bytes);
 
-    // 結果を1600ビットのブール配列に変換して返す
     let mut result = [false; 1600];
 
-    // ハッシュ値（32バイト）を結果の最初の256ビットにコピー
+    // Copy the first 256 bits of the hash
     for i in 0..256 {
         result[i] = (hash[i / 8] >> (i % 8)) & 1 == 1;
     }
 
-    // 残りのビットは入力をそのまま使用
+    // Copy the remaining 1344 bits of the hash
     for i in 256..1600 {
         result[i] = m[i];
     }
