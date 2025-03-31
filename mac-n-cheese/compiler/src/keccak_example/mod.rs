@@ -122,7 +122,9 @@ fn parse_circuit() -> Circuit {
 }
 
 fn do_keccak(m: [bool; 1600]) -> [bool; 1600] {
-    todo!()
+    let mut state = m;
+    vectoreyes::keccak_f1600_permutation(&mut state);
+    state
 }
 
 const NUM_INPUTS_U32: u32 = NUM_INPUTS as u32;
