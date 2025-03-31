@@ -5713,30 +5713,16 @@ impl crate::AesBlockCipher for Aes256EncryptOnly {
     }
 }
 use std::convert::TryInto;
-#[doc = " Keccak module providing functionality for Keccak-f[1600] permutation and SHA-3 hash functions\n\n This implementation is based on the FIPS 202 standard:\n https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf\n\n It provides support for:\n - Keccak-f[1600] permutation function\n - SHA3-224, SHA3-256, SHA3-384, SHA3-512 hash functions\n - SHAKE128, SHAKE256 extendable output functions\n State size for Keccak-f[1600] in bytes"]
+#[doc = " Keccak module providing functionality for Keccak-f[1600] permutation and SHA3-256 hash function\n\n This implementation is based on the FIPS 202 standard:\n https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.202.pdf\n\n It provides support for:\n - Keccak-f[1600] permutation function\n - SHA3-256 hash function\n State size for Keccak-f[1600] in bytes"]
 pub const STATE_SIZE: usize = 200; // 1600 bits = 200 bytes
 #[doc = "Lane size in bytes"]
 pub const LANE_SIZE: usize = 8; // 64 bits = 8 bytes
 #[doc = "Number of rounds for Keccak-f[1600]"]
 pub const NUM_ROUNDS: usize = 24;
-#[doc = "Delimiters for different SHA-3 variants"]
+#[doc = "Delimiter for SHA3-256"]
 pub const SHA3_DELIMITER: u8 = 0x06;
-#[doc = "Delimiters for SHAKE variants"]
-pub const SHAKE_DELIMITER: u8 = 0x1F;
-#[doc = "Delimiters for cSHAKE variants"]
-pub const CSHAKE_DELIMITER: u8 = 0x04;
-#[doc = "Rate for SHA3-224 in bytes"]
-pub const SHA3_224_RATE: usize = 144; // 1152 bits
 #[doc = "Rate for SHA3-256 in bytes"]
 pub const SHA3_256_RATE: usize = 136; // 1088 bits
-#[doc = "Rate for SHA3-384 in bytes"]
-pub const SHA3_384_RATE: usize = 104; // 832 bits
-#[doc = "Rate for SHA3-512 in bytes"]
-pub const SHA3_512_RATE: usize = 72; // 576 bits
-#[doc = "Rate for SHAKE128 in bytes"]
-pub const SHAKE128_RATE: usize = 168; // 1344 bits
-#[doc = "Rate for SHAKE256 in bytes"]
-pub const SHAKE256_RATE: usize = 136; // 1088 bits
 #[doc = "Round constants for Keccak-f permutation"]
 const RC: [u64; NUM_ROUNDS] = [
     0x0000000000000001,
@@ -5866,14 +5852,13 @@ impl KeccakState {
         while offset + rate <= input.len() {
             // XOR block into state
             for i in 0..rate {
-                let state_byte_idx = i;
-                let x = state_byte_idx % 5;
-                let y = state_byte_idx / 5 / 8;
-                let z = (state_byte_idx / 5) % 8;
+                let lane_index = i / 8;
+                let x = lane_index % 5;
+                let y = lane_index / 5;
+                let z = i % 8;
                 let shift = z * 8;
-                let mask = !(0xFFu64 << shift);
                 let byte_value = (input[offset + i] as u64) << shift;
-                self.state[x][y] = (self.state[x][y] & mask) | byte_value;
+                self.state[x][y] ^= byte_value;
             } // Apply permutation
             self.permute();
             offset += rate;
@@ -5881,14 +5866,13 @@ impl KeccakState {
         if offset < input.len() {
             let remaining = input.len() - offset; // XOR remaining bytes
             for i in 0..remaining {
-                let state_byte_idx = i;
-                let x = state_byte_idx % 5;
-                let y = state_byte_idx / 5 / 8;
-                let z = (state_byte_idx / 5) % 8;
+                let lane_index = i / 8;
+                let x = lane_index % 5;
+                let y = lane_index / 5;
+                let z = i % 8;
                 let shift = z * 8;
-                let mask = !(0xFFu64 << shift);
                 let byte_value = (input[offset + i] as u64) << shift;
-                self.state[x][y] = (self.state[x][y] & mask) | byte_value;
+                self.state[x][y] ^= byte_value;
             }
         }
     }
@@ -5898,10 +5882,10 @@ impl KeccakState {
         while offset + rate <= output.len() {
             // Extract bytes from state
             for i in 0..rate {
-                let state_byte_idx = i;
-                let x = state_byte_idx % 5;
-                let y = state_byte_idx / 5 / 8;
-                let z = (state_byte_idx / 5) % 8;
+                let lane_index = i / 8;
+                let x = lane_index % 5;
+                let y = lane_index / 5;
+                let z = i % 8;
                 let shift = z * 8;
                 output[offset + i] = (self.state[x][y] >> shift) as u8;
             } // Apply permutation if more output needed
@@ -5913,34 +5897,34 @@ impl KeccakState {
         if offset < output.len() {
             let remaining = output.len() - offset; // Extract remaining bytes
             for i in 0..remaining {
-                let state_byte_idx = i;
-                let x = state_byte_idx % 5;
-                let y = state_byte_idx / 5 / 8;
-                let z = (state_byte_idx / 5) % 8;
+                let lane_index = i / 8;
+                let x = lane_index % 5;
+                let y = lane_index / 5;
+                let z = i % 8;
                 let shift = z * 8;
                 output[offset + i] = (self.state[x][y] >> shift) as u8;
             }
         }
     }
     #[doc = "Finalize absorption phase with appropriate padding"]
-    pub fn pad(&mut self, rate: usize, delimiter: u8) {
-        // Apply delimited suffix
-        let state_byte_idx = 0; // Padding starts at first unused byte
-        let x = state_byte_idx % 5;
-        let y = state_byte_idx / 5 / 8;
-        let z = (state_byte_idx / 5) % 8;
+    pub fn pad(&mut self, rate: usize, position: usize, delimiter: u8) {
+        // Apply delimited suffix at the current position
+        let lane_index = position / 8;
+        let x = lane_index % 5;
+        let y = lane_index / 5;
+        let z = position % 8;
         let shift = z * 8;
-        let mask = !(0xFFu64 << shift);
         let byte_value = (delimiter as u64) << shift;
-        self.state[x][y] = (self.state[x][y] & mask) | byte_value; // Apply pad10*1 padding
-                                                                   // Set MSB of last byte
+        self.state[x][y] ^= byte_value; // Apply pad10*1 padding
+                                        // Set MSB of last byte
         let last_byte_idx = rate - 1;
-        let x = last_byte_idx % 5;
-        let y = last_byte_idx / 5 / 8;
-        let z = (last_byte_idx / 5) % 8;
+        let lane_index = last_byte_idx / 8;
+        let x = lane_index % 5;
+        let y = lane_index / 5;
+        let z = last_byte_idx % 8;
         let shift = z * 8;
         let mask = 0x80u64 << shift;
-        self.state[x][y] |= mask; // Apply permutation
+        self.state[x][y] ^= mask; // Apply permutation
         self.permute();
     }
 }
@@ -5955,8 +5939,8 @@ pub struct Sha3 {
     delimiter: u8,
     #[doc = "Current position in the buffer"]
     position: usize,
-    #[doc = "Buffer for partial blocks"]
-    buffer: Vec<u8>,
+    #[doc = "Buffer for partial blocks (fixed size to avoid allocations)"]
+    buffer: [u8; SHA3_256_RATE],
     #[doc = "Is the hasher finalized?"]
     finalized: bool,
 }
@@ -5968,33 +5952,13 @@ impl Sha3 {
             rate,
             delimiter,
             position: 0,
-            buffer: vec![0; rate],
+            buffer: [0; SHA3_256_RATE],
             finalized: false,
         }
-    }
-    #[doc = "Create a new SHA3-224 hasher"]
-    pub fn sha3_224() -> Self {
-        Self::new(SHA3_224_RATE, SHA3_DELIMITER)
     }
     #[doc = "Create a new SHA3-256 hasher"]
     pub fn sha3_256() -> Self {
         Self::new(SHA3_256_RATE, SHA3_DELIMITER)
-    }
-    #[doc = "Create a new SHA3-384 hasher"]
-    pub fn sha3_384() -> Self {
-        Self::new(SHA3_384_RATE, SHA3_DELIMITER)
-    }
-    #[doc = "Create a new SHA3-512 hasher"]
-    pub fn sha3_512() -> Self {
-        Self::new(SHA3_512_RATE, SHA3_DELIMITER)
-    }
-    #[doc = "Create a new SHAKE128 hasher"]
-    pub fn shake128() -> Self {
-        Self::new(SHAKE128_RATE, SHAKE_DELIMITER)
-    }
-    #[doc = "Create a new SHAKE256 hasher"]
-    pub fn shake256() -> Self {
-        Self::new(SHAKE256_RATE, SHAKE_DELIMITER)
     }
     #[doc = "Update the hasher with input data"]
     pub fn update(&mut self, input: &[u8]) {
@@ -6031,24 +5995,22 @@ impl Sha3 {
     #[doc = "Finalize the hasher and return the digest"]
     pub fn finalize(&mut self, output_len: usize) -> Vec<u8> {
         if !self.finalized {
-            // Pad and process remaining data
-            let mut final_block = vec![0; self.rate];
-            final_block[..self.position].copy_from_slice(&self.buffer[..self.position]);
-            final_block[self.position] = self.delimiter;
-            final_block[self.rate - 1] |= 0x80;
-            self.state.absorb(&final_block, self.rate);
+            // According to FIPS 202, the SHA-3 padding rule is:
+            // 1. Append the bits 01 (for SHA-3)
+            // 2. Append a bit 1
+            // 3. Append zero or more bits 0, followed by a bit 1
+            // Create a final block using our existing buffer
+            let mut final_block = [0u8; SHA3_256_RATE]; // Copy existing data from buffer
+            final_block[..self.position].copy_from_slice(&self.buffer[..self.position]); // Add the delimiter byte (0x06 = 00000110b for SHA-3)
+                                                                                         // This includes the domain separator (01) and the first padding bit (1)
+            final_block[self.position] = self.delimiter; // Add the final padding bit (1) at the end of the block
+            final_block[self.rate - 1] |= 0x80; // Absorb the final block
+            self.state.absorb(&final_block[..self.rate], self.rate);
             self.finalized = true;
         } // Squeeze output
         let mut output = vec![0; output_len];
         self.state.squeeze(&mut output, self.rate);
         output
-    }
-    #[doc = "Convenience method for SHA3-224"]
-    pub fn sha3_224_hash(input: &[u8]) -> [u8; 28] {
-        let mut hasher = Self::sha3_224();
-        hasher.update(input);
-        let result = hasher.finalize(28);
-        result.try_into().expect("Output length is incorrect")
     }
     #[doc = "Convenience method for SHA3-256"]
     pub fn sha3_256_hash(input: &[u8]) -> [u8; 32] {
@@ -6056,32 +6018,6 @@ impl Sha3 {
         hasher.update(input);
         let result = hasher.finalize(32);
         result.try_into().expect("Output length is incorrect")
-    }
-    #[doc = "Convenience method for SHA3-384"]
-    pub fn sha3_384_hash(input: &[u8]) -> [u8; 48] {
-        let mut hasher = Self::sha3_384();
-        hasher.update(input);
-        let result = hasher.finalize(48);
-        result.try_into().expect("Output length is incorrect")
-    }
-    #[doc = "Convenience method for SHA3-512"]
-    pub fn sha3_512_hash(input: &[u8]) -> [u8; 64] {
-        let mut hasher = Self::sha3_512();
-        hasher.update(input);
-        let result = hasher.finalize(64);
-        result.try_into().expect("Output length is incorrect")
-    }
-    #[doc = "Convenience method for SHAKE128"]
-    pub fn shake128_xof(input: &[u8], output_len: usize) -> Vec<u8> {
-        let mut hasher = Self::shake128();
-        hasher.update(input);
-        hasher.finalize(output_len)
-    }
-    #[doc = "Convenience method for SHAKE256"]
-    pub fn shake256_xof(input: &[u8], output_len: usize) -> Vec<u8> {
-        let mut hasher = Self::shake256();
-        hasher.update(input);
-        hasher.finalize(output_len)
     }
 }
 #[doc = "Converts a 1600-bit state as a boolean array to a KeccakState struct"]
@@ -6138,16 +6074,6 @@ mod tests {
                 .unwrap();
         let hash = Sha3::sha3_256_hash(input);
         assert_eq!(hash.to_vec(), expected);
-    }
-    #[test]
-    fn test_shake128() {
-        // Test vector from NIST
-        let input = b"";
-        let expected =
-            hex::decode("7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26")
-                .unwrap();
-        let hash = Sha3::shake128_xof(input, 32);
-        assert_eq!(hash, expected);
     }
 } // Implement the intrinsics
 select_impl! { scalar { // Scalar has no intrinsics
