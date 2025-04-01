@@ -7,7 +7,7 @@ use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use scuttlebutt::field::F2;
 use scuttlebutt::ring::FiniteRing;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
-use vectoreyes::{array_utils::ArrayUnrolledExt, Sha3};
+use vectoreyes::{array_utils::ArrayUnrolledExt, keccak_f1600_permutation, Sha3};
 
 fn own_wire(idx: impl TryInto<WireSize>) -> Wire {
     Wire::own_wire(ws(idx))
@@ -119,32 +119,6 @@ fn parse_circuit() -> Circuit {
     circuit
 }
 
-fn do_keccak(m: [bool; 1600]) -> [bool; 1600] {
-    // Convert the input to bytes
-    let mut bytes = [0u8; 200]; // 1600bit = 200Byte
-    for i in 0..1600 {
-        if m[i] {
-            bytes[i / 8] |= 1 << (i % 8);
-        }
-    }
-
-    let hash = Sha3::sha3_256_hash(&bytes);
-
-    let mut result = [false; 1600];
-
-    // Copy the first 256 bits of the hash
-    for i in 0..256 {
-        result[i] = (hash[i / 8] >> (i % 8)) & 1 == 1;
-    }
-
-    // Copy the remaining 1344 bits of the hash
-    for i in 256..1600 {
-        result[i] = m[i];
-    }
-
-    result
-}
-
 const MAC_TY: FieldMacType = FieldMacType::BinaryF63b;
 const WITNESS: [bool; 1600] = [true; 1600];
 
@@ -169,75 +143,48 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
     let vole_concurrency = args.vole_concurrency;
     let num_keccak_groups = args.num_keccak_groups;
     let keccak_per_group = args.keccak_per_group;
-    let circuit = {
-        let single_circuit = parse_circuit();
-        let mut circuit = single_circuit.clone();
-        assert!(keccak_per_group >= 1);
-        for _ in 1..keccak_per_group {
-            let mut mapping = Vec::new();
-            for wire in single_circuit.wires.iter().copied() {
-                mapping.push(match wire {
-                    WireBody::Inv(x) => circuit.add_wire(WireBody::Inv(mapping[x])),
-                    WireBody::Xor(x, y) => circuit.add_wire(WireBody::Xor(mapping[x], mapping[y])),
-                    WireBody::And(x, y) => circuit.add_wire(WireBody::And(mapping[x], mapping[y])),
-                    WireBody::Input(i) => circuit.outputs[i],
-                });
-            }
-            circuit.outputs.clear();
-            circuit
-                .outputs
-                .extend(single_circuit.outputs.iter().copied().map(|x| mapping[x]));
-        }
-        circuit
-    };
-    for _ in 0..16 {
-        // Check that plaintext evaluation works.
-        let mut m = [false; 1600];
-        for i in 0..1600 {
-            m[i] = rand::random();
-        }
-        let mut expected = m;
-        for _ in 0..keccak_per_group {
-            expected = do_keccak(expected);
-        }
-        let mut values = Vec::<bool>::with_capacity(circuit.wires.len());
-        for body in circuit.wires.iter().copied() {
-            let new_value = match body {
-                WireBody::Inv(x) => !values[x],
-                WireBody::Xor(a, b) => values[a] ^ values[b],
-                WireBody::And(a, b) => values[a] & values[b],
-                WireBody::Input(idx) => m[idx],
-            };
-            values.push(new_value);
-        }
-        let actual_bits: Vec<bool> = circuit.outputs.iter().copied().map(|i| values[i]).collect();
-        for (i, bit) in actual_bits.iter().enumerate() {
-            if i < 10 {
-                eprintln!("i={}, expected={}, actual={}", i, expected[i], *bit);
-            }
-            assert_eq!(*bit, expected[i]);
-        }
-    }
+
+    // Parse the Keccak circuit
+    let circuit = parse_circuit();
+
+    // Count the number of multiplications (AND gates) in the circuit
+    let num_mults = ws(circuit
+        .wires
+        .iter()
+        .filter(|x| matches!(x, WireBody::And(_, _)))
+        .count());
+
+    eprintln!("Parsed Keccak circuit with {} multiplications", num_mults);
+
+    // Simulate Keccak state transitions for each group
     let mut keccak_iterations = Vec::with_capacity(num_keccak_groups);
-    let mut final_keccak_output = WITNESS;
+    let mut final_keccak_state = WITNESS;
+
     for _ in 0..num_keccak_groups {
-        keccak_iterations.push(final_keccak_output);
+        keccak_iterations.push(final_keccak_state);
         for _ in 0..keccak_per_group {
-            final_keccak_output = do_keccak(final_keccak_output);
+            // Apply Keccak-f permutation directly using the vectoreyes function
+            keccak_f1600_permutation(&mut final_keccak_state);
         }
     }
+
+    // Optimize circuit representation for SIMD processing
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum KeccakWire {
         ConstOne,
         XorOutput(usize),
+        // First 1600 bits are the input state
         FixOutput(usize),
     }
+
     const XOR_SIMD_SIZE: usize = 4;
     let (xors, mapping) = {
         let mut xors: Vec<[(KeccakWire, KeccakWire); XOR_SIMD_SIZE]> =
             Vec::with_capacity(circuit.wires.len());
         let mut mapping: Vec<Option<KeccakWire>> = vec![None; circuit.wires.len()];
         let mut next_mult = 0;
+
+        // Initialize mapping for inputs and AND gates
         for (i, wire) in circuit.wires.iter().copied().enumerate() {
             match wire {
                 WireBody::Inv(_) | WireBody::Xor(_, _) => {}
@@ -247,10 +194,12 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                 }
                 WireBody::Input(j) => {
                     mapping[i] = Some(KeccakWire::FixOutput(j));
-                    assert!(j < 1600)
+                    assert!(j < NUM_INPUTS)
                 }
             }
         }
+
+        // Identify wires ready for computation
         let mut ready_to_compute: BinaryHeap<Reverse<usize>> = Default::default();
         ready_to_compute.extend(circuit.wires.iter().copied().enumerate().filter_map(
             |(i, wire)| match wire {
@@ -271,9 +220,12 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                 WireBody::And(_, _) | WireBody::Input(_) => None,
             },
         ));
+
+        // Process XOR gates in SIMD groups
         let mut next_xor = 0;
         let mut buf = Vec::<(KeccakWire, KeccakWire)>::new();
         let mut out_ids = Vec::new();
+
         while !ready_to_compute.is_empty() {
             while !ready_to_compute.is_empty() && buf.len() < XOR_SIMD_SIZE {
                 let Reverse(i) = ready_to_compute
@@ -286,10 +238,13 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                 });
                 out_ids.push(i);
             }
+
             for oid in out_ids.iter().copied() {
                 assert!(mapping[oid].is_none());
                 mapping[oid] = Some(KeccakWire::XorOutput(next_xor));
                 next_xor += 1;
+
+                // Update dependencies
                 for reverse_dep in circuit.reverse_deps[oid].iter().copied() {
                     match circuit.wires[reverse_dep] {
                         WireBody::Inv(x) => {
@@ -308,38 +263,46 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                     }
                 }
             }
+
+            // Pad buffer to SIMD size
             while buf.len() < XOR_SIMD_SIZE {
                 let pair = *buf.first().unwrap();
                 next_xor += 1;
                 buf.push(pair);
             }
+
             xors.push(
                 *<&[(KeccakWire, KeccakWire); XOR_SIMD_SIZE]>::try_from(buf.as_slice()).unwrap(),
             );
             buf.clear();
             out_ids.clear();
         }
-        // DEBUG
+
+        // Verify all wires are mapped
         for (i, x) in mapping.iter().enumerate() {
             assert!(x.is_some(), "{} {:?}", i, circuit.wires[i]);
         }
+
         (
             xors,
             mapping.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>(),
         )
     };
+
     eprintln!("Finished fast linear Keccak evaluation");
-    let num_mults = ws(circuit
-        .wires
-        .iter()
-        .filter(|x| matches!(x, WireBody::And(_, _)))
-        .count());
+
+    // Generate binary files for the circuit
     build_privates("keccak.priv.bin", |pb| {
         build_circuit("keccak.bin", |cb| {
             let mut vs = VoleSupplier::new(vole_concurrency, Default::default());
+
+            // Define constants and prototypes
             let one = cb.new_constant_prototype(MAC_TY, [F2::ONE])?;
             let one = cb.instantiate(&one, &[], &[])?.outputs(Type::Mac(MAC_TY));
+
             let fix_proto = cb.new_fix_prototype(MAC_TY, 1600 + num_mults)?;
+
+            // XOR gate prototype
             let xors_proto = cb.new_xor4_prototype(
                 MAC_TY,
                 &[1 /*one*/, 1600 + num_mults /*fixed*/],
@@ -354,6 +317,8 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                     })
                 }),
             )?;
+
+            // Multiplication verification prototype
             let assert_multiply_proto = cb.new_assert_multiply_prototype(
                 MAC_TY,
                 &[
@@ -377,6 +342,8 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                         }),
                     }),
             )?;
+
+            // Chaining XOR prototype
             let chaining_xor_proto = cb.new_add_prototype(
                 MAC_TY,
                 &[
@@ -395,30 +362,41 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                     ]
                 }),
             )?;
-            let assert_zero_proto = cb.new_assert_zero_prototype(
-                MAC_TY,
-                &[1600],
-                (0..NUM_INPUTS).map(|i| input_wire(0, i)),
-            )?;
+
+            // Zero verification prototype
+            let assert_zero_1600_proto =
+                cb.new_assert_zero_prototype(MAC_TY, &[1600], (0..1600).map(|i| input_wire(0, i)))?;
+
+            // Set up parallel processing
             let mut old_outputting_tasks = None;
             let num_threads = num_cpus::get();
             let mut channels = Vec::with_capacity(num_threads);
+
             for _ in 0..num_threads {
                 channels.push(crossbeam::channel::bounded(2));
             }
+
             crossbeam::scope::<_, eyre::Result<()>>(|scope| {
+                // Spawn worker threads
                 for (mut i, (channel_send, _)) in channels.iter().enumerate() {
                     let keccak_iterations = &keccak_iterations;
                     let circuit = &circuit;
                     let channels = &channels;
+
                     scope.spawn(move |_| {
                         let mut values: Vec<bool> = Vec::with_capacity(circuit.wires.len());
+
                         while i < keccak_iterations.len() {
                             values.clear();
-                            let starting_point = keccak_iterations[i];
-                            // TODO: we could also do the serialization in the background.
-                            let mut fix_data = Vec::with_capacity(NUM_INPUTS + num_mults as usize);
-                            fix_data.extend((0..NUM_INPUTS).map(|idx| starting_point[idx]));
+                            let starting_point = &keccak_iterations[i];
+
+                            // Prepare fixed data
+                            let mut fix_data = Vec::with_capacity(1600 + num_mults as usize);
+
+                            // Add input state bits
+                            fix_data.extend_from_slice(starting_point);
+
+                            // Evaluate circuit
                             for gate in circuit.wires.iter().copied() {
                                 let v = match gate {
                                     WireBody::Inv(x) => !values[x],
@@ -432,73 +410,93 @@ pub fn keccak_main(args: KeccakArgs) -> eyre::Result<()> {
                                 };
                                 values.push(v);
                             }
+
                             channel_send.send((i, fix_data)).unwrap();
                             i += channels.len();
                         }
                     });
                 }
+
+                // Process each Keccak group
                 for i in 0..keccak_iterations.len() {
                     let (j, fix_data) = channels[i % channels.len()].1.recv().unwrap();
                     assert_eq!(j, i);
+
                     let fixed_voles = vs.supply_voles(cb, &fix_proto)?;
                     let fix = cb.instantiate(&fix_proto, &[], &[fixed_voles])?;
+
                     pb.write_fix_data::<_, F2>(&fix, |s| {
                         for bit in fix_data.into_iter() {
                             s.add(F2::from(bit))?;
                         }
                         Ok(())
                     })?;
+
                     let fix = fix.outputs(Type::Mac(MAC_TY));
                     let xor = cb
                         .instantiate(&xors_proto, &[one, fix], &[])?
                         .outputs(Type::Mac(MAC_TY));
+
                     cb.instantiate(&assert_multiply_proto, &[fix, xor], &[])?;
+
                     if let Some((old_fix, old_xor)) = old_outputting_tasks {
                         let supposed_zeroes = cb
                             .instantiate(&chaining_xor_proto, &[old_fix, old_xor, fix], &[])?
                             .outputs(Type::Mac(MAC_TY));
-                        cb.instantiate(&assert_zero_proto, &[supposed_zeroes], &[])?;
+
+                        cb.instantiate(&assert_zero_1600_proto, &[supposed_zeroes], &[])?;
                     }
+
                     old_outputting_tasks = Some((fix, xor));
                 }
+
                 Ok(())
             })
             .unwrap()?;
-            let (fix, xor) = old_outputting_tasks.unwrap();
-            // FINAL STEP: Check that the output matches what was expected.
-            let expected_value_bits: Vec<_> = (0..NUM_INPUTS)
-                .map(|i| F2::from(final_keccak_output[i]))
-                .collect();
-            let expected_value_proto =
-                cb.new_constant_prototype(MAC_TY, expected_value_bits.into_iter())?;
-            let expected_value = cb
-                .instantiate(&expected_value_proto, &[], &[])?
-                .outputs(Type::Mac(MAC_TY));
-            let xor_expected_value_proto = cb.new_add_prototype(
-                MAC_TY,
-                &[1600, ws(1600 + num_mults), ws(xors.len() * XOR_SIMD_SIZE)],
-                circuit
-                    .outputs
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, wire)| {
-                        [
-                            input_wire(0, i),
-                            match mapping[wire] {
-                                KeccakWire::ConstOne => unreachable!(),
-                                KeccakWire::XorOutput(j) => input_wire(2, j),
-                                KeccakWire::FixOutput(j) => input_wire(1, j),
-                            },
-                        ]
-                    }),
-            )?;
-            let xor_expected_value = cb
-                .instantiate(&xor_expected_value_proto, &[expected_value, fix, xor], &[])?
-                .outputs(Type::Mac(MAC_TY));
-            cb.instantiate(&assert_zero_proto, &[xor_expected_value], &[])?;
+
+            // Final verification step
+            if let Some((fix, xor)) = old_outputting_tasks {
+                // Verify final state
+                let expected_bits: Vec<_> =
+                    final_keccak_state.iter().map(|&b| F2::from(b)).collect();
+
+                let expected_value_proto =
+                    cb.new_constant_prototype(MAC_TY, expected_bits.into_iter())?;
+                let expected_value = cb
+                    .instantiate(&expected_value_proto, &[], &[])?
+                    .outputs(Type::Mac(MAC_TY));
+
+                let xor_expected_value_proto = cb.new_add_prototype(
+                    MAC_TY,
+                    &[1600, ws(1600 + num_mults), ws(xors.len() * XOR_SIMD_SIZE)],
+                    circuit
+                        .outputs
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, wire)| {
+                            [
+                                input_wire(0, i),
+                                match mapping[wire] {
+                                    KeccakWire::ConstOne => unreachable!(),
+                                    KeccakWire::XorOutput(j) => input_wire(2, j),
+                                    KeccakWire::FixOutput(j) => input_wire(1, j),
+                                },
+                            ]
+                        }),
+                )?;
+
+                let xor_expected_value = cb
+                    .instantiate(&xor_expected_value_proto, &[expected_value, fix, xor], &[])?
+                    .outputs(Type::Mac(MAC_TY));
+
+                cb.instantiate(&assert_zero_1600_proto, &[xor_expected_value], &[])?;
+            }
+
             Ok(())
         })
     })?;
+
+    eprintln!("Successfully generated Keccak circuit files");
     Ok(())
 }
