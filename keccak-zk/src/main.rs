@@ -1,0 +1,595 @@
+// External dependencies
+use clap::{Parser, Subcommand};
+use eyre::{bail, Result};
+use std::{cmp::Reverse, collections::BinaryHeap, fs::File, io::BufReader, str::FromStr};
+
+// Circuit compilation dependencies
+use mac_n_cheese_ir::{
+    circuit_builder::{build_circuit, build_privates, vole_supplier::VoleSupplier},
+    compilation_format::{wire_format::Wire, FieldMacType, Type, WireSize},
+};
+
+// Zero knowledge proof dependencies
+use scuttlebutt::{field::F2, ring::FiniteRing};
+
+// Keccak implementation
+use vectoreyes::{array_utils::ArrayUnrolledExt, keccak_f1600_permutation};
+
+#[derive(Parser)]
+#[command(name = "keccak_zk")]
+#[command(about = "Compile Keccak_f circuit and generate/verify proofs")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Compile Keccak_f circuit from bristol-fashion to SIEVE IR
+    Compile {
+        #[arg(short, long)]
+        input: String,
+
+        #[arg(short, long)]
+        output_prefix: String,
+    },
+}
+
+// Helper functions for wire handling
+fn own_wire(idx: impl TryInto<WireSize>) -> Wire {
+    Wire::own_wire(ws(idx))
+}
+
+fn input_wire(which_input: impl TryInto<WireSize>, which_wire: impl TryInto<WireSize>) -> Wire {
+    Wire::input_wire(ws(which_input), ws(which_wire))
+}
+
+fn ws(x: impl TryInto<WireSize>) -> WireSize {
+    match x.try_into() {
+        Ok(y) => y,
+        Err(_) => panic!("wire size overflow"),
+    }
+}
+
+// Circuit representation
+type WireId = usize;
+
+#[derive(Debug, Clone, Copy)]
+enum WireBody {
+    Inv(WireId),
+    Xor(WireId, WireId),
+    And(WireId, WireId),
+    Input(usize),
+}
+
+#[derive(Default, Clone)]
+struct Circuit {
+    wires: Vec<WireBody>,
+    reverse_deps: Vec<Vec<WireId>>,
+    outputs: Vec<WireId>,
+}
+
+impl Circuit {
+    fn add_wire(&mut self, body: WireBody) -> WireId {
+        let out = self.wires.len();
+        self.reverse_deps.push(Vec::new());
+        match body {
+            WireBody::Inv(x) => self.reverse_deps[x].push(out),
+            WireBody::Xor(a, b) => {
+                self.reverse_deps[a].push(out);
+                if a != b {
+                    self.reverse_deps[b].push(out);
+                }
+            }
+            WireBody::And(a, b) => {
+                self.reverse_deps[a].push(out);
+                if a != b {
+                    self.reverse_deps[b].push(out);
+                }
+            }
+            WireBody::Input(_) => {}
+        }
+        self.wires.push(body);
+        out
+    }
+}
+
+// Constants
+const NUM_INPUTS: usize = 1600;
+const MAC_TY: FieldMacType = FieldMacType::BinaryF63b;
+
+fn parse_circuit(input_path: &str) -> Result<Circuit> {
+    let file = File::open(input_path)?;
+    let reader = BufReader::new(file);
+    let src = std::io::read_to_string(reader)?;
+
+    // We're parsing the initial version of bristol circuits, not the newer version.
+    let mut lines = src.trim().split('\n');
+    let hdr = Vec::from_iter(lines.next().unwrap().split_ascii_whitespace());
+    let _num_gates = usize::from_str(hdr[0]).unwrap();
+    let num_wires = usize::from_str(hdr[1]).unwrap();
+    let mut bristol2wire = vec![None; num_wires];
+    let mut circuit = Circuit::default();
+    // Use the minimum of NUM_INPUTS and num_wires to avoid index out of bounds
+    let num_inputs = std::cmp::min(NUM_INPUTS, num_wires);
+    for i in 0..num_inputs {
+        bristol2wire[i] = Some(circuit.add_wire(WireBody::Input(i)));
+    }
+
+    let _ = lines.next().unwrap(); // Skip number of input wires
+    let _ = lines.next().unwrap(); // Skip number of output wires
+    let _ = lines.next().unwrap(); // Skip empty line
+
+    let mut buf = Vec::new();
+    for line in lines {
+        buf.clear();
+        buf.extend(line.split_ascii_whitespace());
+        match *buf.last().unwrap() {
+            "XOR" => {
+                assert_eq!(buf[0], "2");
+                assert_eq!(buf[1], "1");
+                let in0 = usize::from_str(buf[2]).unwrap();
+                let in1 = usize::from_str(buf[3]).unwrap();
+                let output = usize::from_str(buf[4]).unwrap();
+                let in0 = bristol2wire[in0].unwrap();
+                let in1 = bristol2wire[in1].unwrap();
+                assert!(bristol2wire[output].is_none());
+                bristol2wire[output] = Some(circuit.add_wire(WireBody::Xor(in0, in1)));
+            }
+            "AND" => {
+                assert_eq!(buf[0], "2");
+                assert_eq!(buf[1], "1");
+                let in0 = usize::from_str(buf[2]).unwrap();
+                let in1 = usize::from_str(buf[3]).unwrap();
+                let output = usize::from_str(buf[4]).unwrap();
+                let in0 = bristol2wire[in0].unwrap();
+                let in1 = bristol2wire[in1].unwrap();
+                assert!(bristol2wire[output].is_none());
+                bristol2wire[output] = Some(circuit.add_wire(WireBody::And(in0, in1)));
+            }
+            "INV" => {
+                assert_eq!(buf[0], "1");
+                assert_eq!(buf[1], "1");
+                let input = usize::from_str(buf[2]).unwrap();
+                let output = usize::from_str(buf[3]).unwrap();
+                let input = bristol2wire[input].unwrap();
+                assert!(bristol2wire[output].is_none());
+                bristol2wire[output] = Some(circuit.add_wire(WireBody::Inv(input)));
+            }
+            cmd => panic!("unknown gate {cmd:?}"),
+        }
+    }
+
+    assert_eq!(circuit.wires.len(), num_wires);
+
+    // For the Keccak_f circuit, the outputs are the last 1600 wires
+    // For smaller test circuits, we use the last half of the wires as outputs
+    let output_start = if num_wires >= 1600 {
+        num_wires - 1600
+    } else {
+        num_wires / 2
+    };
+
+    circuit.outputs = bristol2wire[output_start..]
+        .iter()
+        .copied()
+        .map(|x| x.unwrap())
+        .collect();
+
+    Ok(circuit)
+}
+
+fn compile_circuit(input_path: &str, output_prefix: &str) -> Result<()> {
+    // Parse the bristol-fashion circuit
+    let circuit = parse_circuit(input_path)?;
+
+    println!(
+        "Parsed bristol-fashion circuit with {} gates",
+        circuit.wires.len()
+    );
+
+    // Count the number of multiplications (AND gates) in the circuit
+    let num_mults = ws(circuit
+        .wires
+        .iter()
+        .filter(|x| matches!(x, WireBody::And(_, _)))
+        .count());
+
+    println!("Circuit has {} multiplications", num_mults);
+
+    // Read private input file
+    println!("Reading private input file: keccak_private_input.txt");
+    let private_input = std::fs::read_to_string("keccak_private_input.txt")?;
+
+    // Parse private input
+    let mut witness = [false; NUM_INPUTS];
+    let mut input_lines = private_input.lines();
+
+    // Skip header lines
+    while let Some(line) = input_lines.next() {
+        if line.trim() == "@begin" {
+            break;
+        }
+    }
+
+    // Parse input values
+    let mut idx = 0;
+    for line in input_lines {
+        if line.trim() == "@end" {
+            break;
+        }
+
+        let line = line.trim();
+        if line.starts_with('<') && line.ends_with('>') {
+            let value = line[1..line.len() - 1].trim();
+            if value == "1" {
+                witness[idx] = true;
+                if idx % 100 == 0 {
+                    println!("Processed {} inputs...", idx);
+                }
+            } else if value == "0" {
+                witness[idx] = false;
+                if idx % 100 == 0 {
+                    println!("Processed {} inputs...", idx);
+                }
+            } else {
+                bail!("Invalid input value: {}", value);
+            }
+            idx += 1;
+
+            if idx >= NUM_INPUTS {
+                break;
+            }
+        }
+    }
+
+    if idx < NUM_INPUTS {
+        println!("Warning: Not enough input values provided. Using default (false) for remaining inputs.");
+        println!("Expected {} inputs, but only found {}", NUM_INPUTS, idx);
+    } else {
+        println!("Successfully loaded all {} input values", idx);
+    }
+
+    println!("Applying Keccak-f permutation to the input state...");
+
+    // Simulate Keccak state transitions
+    let mut final_keccak_state = witness;
+
+    // Apply Keccak-f permutation
+    keccak_f1600_permutation(&mut final_keccak_state);
+
+    // Optimize circuit representation for SIMD processing
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum KeccakWire {
+        ConstOne,
+        XorOutput(usize),
+        // First 1600 bits are the input state
+        FixOutput(usize),
+    }
+
+    const XOR_SIMD_SIZE: usize = 4;
+    let (xors, mapping) = {
+        let mut xors: Vec<[(KeccakWire, KeccakWire); XOR_SIMD_SIZE]> =
+            Vec::with_capacity(circuit.wires.len());
+        let mut mapping: Vec<Option<KeccakWire>> = vec![None; circuit.wires.len()];
+        let mut next_mult = 0;
+
+        // Initialize mapping for inputs and AND gates
+        for (i, wire) in circuit.wires.iter().copied().enumerate() {
+            match wire {
+                WireBody::Inv(_) | WireBody::Xor(_, _) => {}
+                WireBody::And(_, _) => {
+                    mapping[i] = Some(KeccakWire::FixOutput(next_mult + 1600));
+                    next_mult += 1;
+                }
+                WireBody::Input(j) => {
+                    mapping[i] = Some(KeccakWire::FixOutput(j));
+                    assert!(j < NUM_INPUTS)
+                }
+            }
+        }
+
+        // Identify wires ready for computation
+        let mut ready_to_compute: BinaryHeap<Reverse<usize>> = Default::default();
+        ready_to_compute.extend(circuit.wires.iter().copied().enumerate().filter_map(
+            |(i, wire)| match wire {
+                WireBody::Inv(x) => {
+                    if mapping[x].is_some() {
+                        Some(Reverse(i))
+                    } else {
+                        None
+                    }
+                }
+                WireBody::Xor(x, y) => {
+                    if mapping[x].is_some() && mapping[y].is_some() {
+                        Some(Reverse(i))
+                    } else {
+                        None
+                    }
+                }
+                WireBody::And(_, _) | WireBody::Input(_) => None,
+            },
+        ));
+
+        // Process XOR gates in SIMD groups
+        let mut next_xor = 0;
+        let mut buf = Vec::<(KeccakWire, KeccakWire)>::new();
+        let mut out_ids = Vec::new();
+
+        while !ready_to_compute.is_empty() {
+            while !ready_to_compute.is_empty() && buf.len() < XOR_SIMD_SIZE {
+                let Reverse(i) = ready_to_compute
+                    .pop()
+                    .expect("we just confirmed it's nonempty!");
+                buf.push(match circuit.wires[i] {
+                    WireBody::Inv(x) => (KeccakWire::ConstOne, mapping[x].unwrap()),
+                    WireBody::Xor(x, y) => (mapping[x].unwrap(), mapping[y].unwrap()),
+                    WireBody::And(_, _) | WireBody::Input(_) => unreachable!(),
+                });
+                out_ids.push(i);
+            }
+
+            for oid in out_ids.iter().copied() {
+                assert!(mapping[oid].is_none());
+                mapping[oid] = Some(KeccakWire::XorOutput(next_xor));
+                next_xor += 1;
+
+                // Update dependencies
+                for reverse_dep in circuit.reverse_deps[oid].iter().copied() {
+                    match circuit.wires[reverse_dep] {
+                        WireBody::Inv(x) => {
+                            assert_eq!(x, oid);
+                            assert!(mapping[reverse_dep].is_none());
+                            ready_to_compute.push(Reverse(reverse_dep));
+                        }
+                        WireBody::Xor(x, y) => {
+                            assert!(x == oid || y == oid);
+                            assert!(mapping[reverse_dep].is_none());
+                            if mapping[x].is_some() && mapping[y].is_some() {
+                                ready_to_compute.push(Reverse(reverse_dep));
+                            }
+                        }
+                        WireBody::And(_, _) | WireBody::Input(_) => continue,
+                    }
+                }
+            }
+
+            // Pad buffer to SIMD size
+            while buf.len() < XOR_SIMD_SIZE {
+                let pair = *buf.first().unwrap();
+                next_xor += 1;
+                buf.push(pair);
+            }
+
+            xors.push(
+                *<&[(KeccakWire, KeccakWire); XOR_SIMD_SIZE]>::try_from(buf.as_slice()).unwrap(),
+            );
+            buf.clear();
+            out_ids.clear();
+        }
+
+        // Verify all wires are mapped
+        for (i, x) in mapping.iter().enumerate() {
+            assert!(x.is_some(), "{} {:?}", i, circuit.wires[i]);
+        }
+
+        (
+            xors,
+            mapping.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>(),
+        )
+    };
+
+    println!("Finished fast linear Keccak evaluation");
+
+    // Generate binary files for the circuit
+    build_privates(&format!("{}.priv.bin", output_prefix), |pb| {
+        build_circuit(&format!("{}.bin", output_prefix), |cb| {
+            let mut vs = VoleSupplier::new(1, Default::default());
+
+            // Define constants and prototypes
+            let one = cb.new_constant_prototype(MAC_TY, [F2::ONE])?;
+            let one = cb.instantiate(&one, &[], &[])?.outputs(Type::Mac(MAC_TY));
+
+            let fix_proto = cb.new_fix_prototype(MAC_TY, 1600 + num_mults)?;
+
+            // XOR gate prototype
+            let xors_proto = cb.new_xor4_prototype(
+                MAC_TY,
+                &[1 /*one*/, 1600 + num_mults /*fixed*/],
+                xors.iter().copied().map(|entry| {
+                    entry.array_map(|(a, b)| {
+                        let convert = |wire| match wire {
+                            KeccakWire::ConstOne => input_wire(0, 0),
+                            KeccakWire::XorOutput(i) => own_wire(i),
+                            KeccakWire::FixOutput(i) => input_wire(1, i),
+                        };
+                        [convert(a), convert(b)]
+                    })
+                }),
+            )?;
+
+            // Multiplication verification prototype
+            let assert_multiply_proto = cb.new_assert_multiply_prototype(
+                MAC_TY,
+                &[
+                    ws(1600 + num_mults),           /*fixed*/
+                    ws(xors.len() * XOR_SIMD_SIZE), /*xors*/
+                ],
+                circuit
+                    .wires
+                    .iter()
+                    .copied()
+                    .enumerate()
+                    .filter_map(|(i, wire)| match wire {
+                        WireBody::Inv(_) | WireBody::Xor(_, _) | WireBody::Input(_) => None,
+                        WireBody::And(x, y) => Some({
+                            let convert = |j| match mapping[j] {
+                                KeccakWire::ConstOne => unreachable!(),
+                                KeccakWire::XorOutput(idx) => input_wire(1, idx),
+                                KeccakWire::FixOutput(idx) => input_wire(0, idx),
+                            };
+                            [convert(x), convert(y), convert(i)]
+                        }),
+                    }),
+            )?;
+
+            // Prepare fixed data
+            let mut fix_data = Vec::with_capacity(1600 + num_mults as usize);
+
+            // Add input state bits
+            fix_data.extend_from_slice(&witness);
+
+            // Evaluate circuit
+            let mut values: Vec<bool> = Vec::with_capacity(circuit.wires.len());
+            for gate in circuit.wires.iter().copied() {
+                let v = match gate {
+                    WireBody::Inv(x) => !values[x],
+                    WireBody::Xor(x, y) => values[x] ^ values[y],
+                    WireBody::And(x, y) => {
+                        let v = values[x] & values[y];
+                        fix_data.push(v);
+                        v
+                    }
+                    WireBody::Input(x) => fix_data[x],
+                };
+                values.push(v);
+            }
+
+            let fixed_voles = vs.supply_voles(cb, &fix_proto)?;
+            let fix_output = cb.instantiate(&fix_proto, &[], &[fixed_voles])?;
+
+            // Write fix data directly
+            pb.write_fix_data::<_, F2>(&fix_output, |s| {
+                for bit in fix_data.into_iter() {
+                    s.add(F2::from(bit))?;
+                }
+                Ok(())
+            })?;
+
+            // Get the WireSlice for further operations
+            let fix = fix_output.outputs(Type::Mac(MAC_TY));
+            let xor_output = cb.instantiate(&xors_proto, &[one, fix], &[])?;
+            let xor = xor_output.outputs(Type::Mac(MAC_TY));
+
+            cb.instantiate(&assert_multiply_proto, &[fix, xor], &[])?;
+
+            Ok(())
+        })
+    })?;
+
+    println!("Successfully compiled circuit to SIEVE IR");
+    println!("Output files generated:");
+    println!("  - {}.bin", output_prefix);
+    println!("  - {}.priv.bin", output_prefix);
+    println!("You can now use these files to generate and verify proofs.");
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Commands::Compile {
+            input,
+            output_prefix,
+        } => compile_circuit(&input, &output_prefix),
+    }
+}
+
+// Add unit tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    // Test circuit in bristol-fashion format
+    const TEST_CIRCUIT: &str = "4 6
+1 2
+1 2
+
+2 1 0 1 4 XOR
+2 1 2 3 5 AND
+";
+
+    // Test private input in SIEVE IR format
+    const TEST_PRIVATE_INPUT: &str = "version 2.0.0;
+private_input;
+@type field 2;
+@begin
+< 1 >;
+< 1 >;
+@end
+";
+
+    #[test]
+    fn test_parse_circuit() {
+        // Create a temporary directory for test files
+        let dir = tempdir().unwrap();
+
+        // Create a test circuit file
+        let circuit_path = dir.path().join("test_circuit.txt");
+        let mut file = File::create(&circuit_path).unwrap();
+        file.write_all(TEST_CIRCUIT.as_bytes()).unwrap();
+
+        // Parse the circuit
+        let circuit = parse_circuit(circuit_path.to_str().unwrap()).unwrap();
+
+        // Verify the circuit structure
+        assert_eq!(circuit.wires.len(), 6);
+        assert_eq!(circuit.outputs.len(), 2);
+
+        // Count the number of each gate type
+        let xor_count = circuit
+            .wires
+            .iter()
+            .filter(|&gate| matches!(gate, WireBody::Xor(_, _)))
+            .count();
+        let and_count = circuit
+            .wires
+            .iter()
+            .filter(|&gate| matches!(gate, WireBody::And(_, _)))
+            .count();
+
+        assert_eq!(xor_count, 1);
+        assert_eq!(and_count, 1);
+    }
+
+    #[test]
+    fn test_compile_circuit() {
+        // Create a temporary directory for test files
+        let dir = tempdir().unwrap();
+
+        // Create a test circuit file
+        let circuit_path = dir.path().join("test_circuit.txt");
+        let mut file = File::create(&circuit_path).unwrap();
+        file.write_all(TEST_CIRCUIT.as_bytes()).unwrap();
+
+        // Create a test private input file
+        let private_input_path = dir.path().join("keccak_private_imput.txt");
+        let mut file = File::create(&private_input_path).unwrap();
+        file.write_all(TEST_PRIVATE_INPUT.as_bytes()).unwrap();
+
+        // Set the current directory to the temporary directory
+        let original_dir = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+
+        // Compile the circuit
+        let output_prefix = "test_output";
+        let result = compile_circuit(circuit_path.to_str().unwrap(), output_prefix);
+
+        // Restore the original directory
+        std::env::set_current_dir(original_dir).unwrap();
+
+        // Check if compilation succeeded
+        assert!(result.is_ok());
+
+        // Check if output files were created
+        let bin_path = dir.path().join("test_output.bin");
+        let priv_bin_path = dir.path().join("test_output.priv.bin");
+
+        assert!(bin_path.exists());
+        assert!(priv_bin_path.exists());
+    }
+}

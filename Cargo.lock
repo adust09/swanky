@@ -1197,6 +1197,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak-zk"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bristol-fashion",
+ "clap",
+ "crossbeam",
+ "eyre",
+ "mac-n-cheese-ir",
+ "mac-n-cheese-sieve-parser",
+ "merlin",
+ "num_cpus",
+ "rand",
+ "schmivitz",
+ "scuttlebutt",
+ "tempfile",
+ "vectoreyes",
+]
+
+[[package]]
 name = "keyed_arena"
 version = "0.6.0"
 dependencies = [
