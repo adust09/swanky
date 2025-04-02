@@ -1,7 +1,7 @@
 // External dependencies
 use clap::{Parser, Subcommand};
 use eyre::{bail, Result};
-use std::{cmp::Reverse, collections::BinaryHeap, fs::File, io::BufReader, str::FromStr};
+use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
 
 // Circuit compilation dependencies
 use mac_n_cheese_ir::{
@@ -26,13 +26,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Compile Keccak_f circuit from bristol-fashion to SIEVE IR
-    Compile {
-        #[arg(short, long)]
-        input: String,
-
-        #[arg(short, long)]
-        output_prefix: String,
-    },
+    Compile {},
 }
 
 // Helper functions for wire handling
@@ -98,11 +92,8 @@ impl Circuit {
 const NUM_INPUTS: usize = 1600;
 const MAC_TY: FieldMacType = FieldMacType::BinaryF63b;
 
-fn parse_circuit(input_path: &str) -> Result<Circuit> {
-    let file = File::open(input_path)?;
-    let reader = BufReader::new(file);
-    let src = std::io::read_to_string(reader)?;
-
+fn parse_circuit() -> Circuit {
+    let src = include_str!("keccak_f.txt");
     // We're parsing the initial version of bristol circuits, not the newer version.
     let mut lines = src.trim().split('\n');
     let hdr = Vec::from_iter(lines.next().unwrap().split_ascii_whitespace());
@@ -110,16 +101,10 @@ fn parse_circuit(input_path: &str) -> Result<Circuit> {
     let num_wires = usize::from_str(hdr[1]).unwrap();
     let mut bristol2wire = vec![None; num_wires];
     let mut circuit = Circuit::default();
-    // Use the minimum of NUM_INPUTS and num_wires to avoid index out of bounds
-    let num_inputs = std::cmp::min(NUM_INPUTS, num_wires);
-    for i in 0..num_inputs {
+    for i in 0..NUM_INPUTS {
         bristol2wire[i] = Some(circuit.add_wire(WireBody::Input(i)));
     }
-
-    let _ = lines.next().unwrap(); // Skip number of input wires
-    let _ = lines.next().unwrap(); // Skip number of output wires
-    let _ = lines.next().unwrap(); // Skip empty line
-
+    let _ = lines.next().unwrap(); // Skip number of input and output wires
     let mut buf = Vec::new();
     for line in lines {
         buf.clear();
@@ -159,34 +144,17 @@ fn parse_circuit(input_path: &str) -> Result<Circuit> {
             cmd => panic!("unknown gate {cmd:?}"),
         }
     }
-
     assert_eq!(circuit.wires.len(), num_wires);
-
-    // For the Keccak_f circuit, the outputs are the last 1600 wires
-    // For smaller test circuits, we use the last half of the wires as outputs
-    let output_start = if num_wires >= 1600 {
-        num_wires - 1600
-    } else {
-        num_wires / 2
-    };
-
-    circuit.outputs = bristol2wire[output_start..]
+    circuit.outputs = bristol2wire[bristol2wire.len() - 1600..]
         .iter()
         .copied()
         .map(|x| x.unwrap())
         .collect();
-
-    Ok(circuit)
+    circuit
 }
-
-fn compile_circuit(input_path: &str, output_prefix: &str) -> Result<()> {
+fn compile_circuit() -> Result<()> {
     // Parse the bristol-fashion circuit
-    let circuit = parse_circuit(input_path)?;
-
-    println!(
-        "Parsed bristol-fashion circuit with {} gates",
-        circuit.wires.len()
-    );
+    let circuit = parse_circuit();
 
     // Count the number of multiplications (AND gates) in the circuit
     let num_mults = ws(circuit
@@ -195,7 +163,7 @@ fn compile_circuit(input_path: &str, output_prefix: &str) -> Result<()> {
         .filter(|x| matches!(x, WireBody::And(_, _)))
         .count());
 
-    println!("Circuit has {} multiplications", num_mults);
+    eprintln!("Parsed Keccak circuit with {} multiplications", num_mults);
 
     // Read private input file
     println!("Reading private input file: keccak_private_input.txt");
@@ -382,8 +350,8 @@ fn compile_circuit(input_path: &str, output_prefix: &str) -> Result<()> {
     println!("Finished fast linear Keccak evaluation");
 
     // Generate binary files for the circuit
-    build_privates(&format!("{}.priv.bin", output_prefix), |pb| {
-        build_circuit(&format!("{}.bin", output_prefix), |cb| {
+    build_privates(&format!("keccak_f.priv.bin"), |pb| {
+        build_circuit(&format!("keccak_f.bin"), |cb| {
             let mut vs = VoleSupplier::new(1, Default::default());
 
             // Define constants and prototypes
@@ -479,8 +447,8 @@ fn compile_circuit(input_path: &str, output_prefix: &str) -> Result<()> {
 
     println!("Successfully compiled circuit to SIEVE IR");
     println!("Output files generated:");
-    println!("  - {}.bin", output_prefix);
-    println!("  - {}.priv.bin", output_prefix);
+    println!("  - keccak_f.bin");
+    println!("  - keccak_f.priv.bin");
     println!("You can now use these files to generate and verify proofs.");
     Ok(())
 }
@@ -489,10 +457,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Compile {
-            input,
-            output_prefix,
-        } => compile_circuit(&input, &output_prefix),
+        Commands::Compile {} => compile_circuit(),
     }
 }
 
@@ -534,7 +499,7 @@ private_input;
         file.write_all(TEST_CIRCUIT.as_bytes()).unwrap();
 
         // Parse the circuit
-        let circuit = parse_circuit(circuit_path.to_str().unwrap()).unwrap();
+        let circuit = parse_circuit();
 
         // Verify the circuit structure
         assert_eq!(circuit.wires.len(), 6);
@@ -577,7 +542,7 @@ private_input;
 
         // Compile the circuit
         let output_prefix = "test_output";
-        let result = compile_circuit(circuit_path.to_str().unwrap(), output_prefix);
+        let result = compile_circuit();
 
         // Restore the original directory
         std::env::set_current_dir(original_dir).unwrap();
