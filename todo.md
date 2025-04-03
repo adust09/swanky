@@ -111,13 +111,12 @@ This section outlines the specific implementation steps for creating a transpile
 
 ### 7.3 Testing and Validation
 
-- [ ] Create unit tests for gate conversions
-  - [ ] Test XOR to add conversion
-  - [ ] Test AND to mul conversion
-  - [ ] Test INV to add-with-constant conversion
+- [x] Create unit tests for gate conversions
+  - [x] Test XOR to add conversion
+  - [x] Test AND to mul conversion
+  - [x] Test INV to add-with-constant conversion
 
-- [ ] Create integration tests with real circuits
-  - [ ] Test with SHA-256 circuit
+- [ ] **Create integration tests with real circuits**
   - [ ] Test with Keccak-f circuit
   - [ ] Verify output correctness by comparing circuit evaluations
 

@@ -697,4 +697,124 @@ mod tests {
         // std::fs::remove_file(input_path).unwrap();
         // std::fs::remove_file(output_path).unwrap();
     }
+
+    #[test]
+    fn test_xor_to_add_conversion() {
+        // Create a simple Bristol Fashion circuit with only an XOR gate
+        let bristol_str = r#"1 5
+2 1 1
+1 1
+2 1 0 1 4 XOR"#;
+
+        // Parse the circuit
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        // Convert to SIEVE IR
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+
+        // Verify the XOR gate was converted to an Add gate
+        let mut found_add_gate = false;
+        for gate in &sieve.gates {
+            if let SieveGate::Add { inputs, output } = gate {
+                if *output == 4 && inputs.contains(&1) && inputs.contains(&2) {
+                    found_add_gate = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_add_gate,
+            "XOR gate was not properly converted to Add gate"
+        );
+
+        // Verify the SIEVE IR text representation contains the Add gate
+        let sieve_text = sieve.to_string();
+        assert!(
+            sieve_text.contains("$4 <- @add(0: $1, $2);"),
+            "SIEVE IR text does not contain the expected Add gate"
+        );
+    }
+
+    #[test]
+    fn test_and_to_mul_conversion() {
+        // Create a simple Bristol Fashion circuit with only an AND gate
+        let bristol_str = r#"1 5
+2 1 1
+1 1
+2 1 0 1 4 AND"#;
+
+        // Parse the circuit
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        // Convert to SIEVE IR
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+
+        // Verify the AND gate was converted to a Mul gate
+        let mut found_mul_gate = false;
+        for gate in &sieve.gates {
+            if let SieveGate::Mul { inputs, output } = gate {
+                if *output == 4 && inputs.contains(&1) && inputs.contains(&2) {
+                    found_mul_gate = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_mul_gate,
+            "AND gate was not properly converted to Mul gate"
+        );
+
+        // Verify the SIEVE IR text representation contains the Mul gate
+        let sieve_text = sieve.to_string();
+        assert!(
+            sieve_text.contains("$4 <- @mul(0: $1, $2);"),
+            "SIEVE IR text does not contain the expected Mul gate"
+        );
+    }
+
+    #[test]
+    fn test_inv_to_add_with_constant_conversion() {
+        // Create a simple Bristol Fashion circuit with only an INV gate
+        let bristol_str = r#"1 4
+1 1
+1 1
+1 1 0 3 INV"#;
+
+        // Parse the circuit
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        // Convert to SIEVE IR
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+
+        // Verify the constant 1 wire exists
+        assert_eq!(
+            sieve.constant_one_wire, 0,
+            "Constant 1 wire should be at index 0"
+        );
+
+        // Verify the INV gate was converted to an Add gate with the constant 1 wire
+        let mut found_inv_conversion = false;
+        for gate in &sieve.gates {
+            if let SieveGate::Add { inputs, output } = gate {
+                if *output == 3 && inputs.contains(&1) && inputs.contains(&0) {
+                    found_inv_conversion = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_inv_conversion,
+            "INV gate was not properly converted to Add gate with constant 1"
+        );
+
+        // Verify the SIEVE IR text representation contains the Add gate for INV
+        let sieve_text = sieve.to_string();
+        assert!(
+            sieve_text.contains("$3 <- @add(0: $1, $0);"),
+            "SIEVE IR text does not contain the expected Add gate for INV conversion"
+        );
+    }
 }
