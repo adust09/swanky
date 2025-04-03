@@ -7,7 +7,7 @@ use mac_n_cheese_ir::compilation_format::{FieldMacType, Type, WireSize};
 use scuttlebutt::field::F2;
 use scuttlebutt::ring::FiniteRing;
 use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
-use vectoreyes::{array_utils::ArrayUnrolledExt, keccak_f1600_permutation, Sha3};
+use vectoreyes::{array_utils::ArrayUnrolledExt, keccak_f1600_permutation};
 
 fn own_wire(idx: impl TryInto<WireSize>) -> Wire {
     Wire::own_wire(ws(idx))
