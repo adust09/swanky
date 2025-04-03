@@ -817,4 +817,90 @@ mod tests {
             "SIEVE IR text does not contain the expected Add gate for INV conversion"
         );
     }
+
+    #[test]
+    fn test_with_keccak_f_circuit() {
+        // Path to the Keccak_f circuit file
+        let input_path = "src/keccak_f.txt";
+
+        // Parse the Bristol Fashion circuit
+        let bristol =
+            BristolCircuit::from_file(input_path).expect("Failed to parse Keccak_f circuit");
+
+        // Verify basic circuit properties
+        assert_eq!(bristol.num_gates, 192086, "Incorrect number of gates");
+        assert_eq!(bristol.num_wires, 193686, "Incorrect number of wires");
+        assert_eq!(
+            bristol.input_group_sizes,
+            vec![1600],
+            "Incorrect input group sizes"
+        );
+
+        // Convert to SIEVE IR
+        let sieve = SieveCircuit::from_bristol(&bristol).expect("Failed to convert to SIEVE IR");
+
+        // Verify SIEVE IR properties
+        assert_eq!(
+            sieve.constant_one_wire, 0,
+            "Constant 1 wire should be at index 0"
+        );
+
+        // Verify input wires mapping
+        assert_eq!(
+            sieve.input_wires.len(),
+            1600,
+            "Should have 1600 input wires"
+        );
+
+        // Create a temporary output file for the SIEVE IR
+        let output_path = "test_keccak_f_sieve_output.txt";
+
+        // Write SIEVE IR to file
+        sieve
+            .to_file(output_path)
+            .expect("Failed to write SIEVE IR to file");
+
+        // Verify file exists
+        assert!(
+            std::path::Path::new(output_path).exists(),
+            "Output file was not created"
+        );
+
+        // Read the file content to verify basic structure
+        let content = std::fs::read_to_string(output_path).expect("Failed to read output file");
+
+        // Verify content contains expected SIEVE IR elements
+        assert!(
+            content.contains("version 2.0.0;"),
+            "Missing version in output"
+        );
+        assert!(
+            content.contains("circuit;"),
+            "Missing circuit declaration in output"
+        );
+        assert!(
+            content.contains("@type field 2;"),
+            "Missing field type in output"
+        );
+        assert!(content.contains("@begin"), "Missing begin marker in output");
+        assert!(content.contains("@end"), "Missing end marker in output");
+
+        // Verify the constant 1 wire is defined
+        assert!(
+            content.contains("$0 <- @private(0);"),
+            "Missing constant 1 wire definition"
+        );
+
+        // Verify at least one gate of each type exists in the output
+        let has_add_gate = content.contains("@add");
+        let has_mul_gate = content.contains("@mul");
+
+        assert!(has_add_gate, "No add gates found in output");
+        assert!(has_mul_gate, "No mul gates found in output");
+
+        // Clean up the test file
+        // std::fs::remove_file(output_path).expect("Failed to remove test output file");
+
+        println!("Successfully tested transpiler with Keccak_f circuit");
+    }
 }
