@@ -1,7 +1,10 @@
 // External dependencies
 use clap::{Parser, Subcommand};
 use eyre::{bail, Result};
-use std::{cmp::Reverse, collections::BinaryHeap, str::FromStr};
+use std::{cmp::Reverse, collections::BinaryHeap, path::PathBuf, str::FromStr};
+
+// Internal modules
+mod transpiler;
 
 // Circuit compilation dependencies
 use mac_n_cheese_ir::{
@@ -13,7 +16,7 @@ use mac_n_cheese_ir::{
 use scuttlebutt::{field::F2, ring::FiniteRing};
 
 // Keccak implementation
-use vectoreyes::{array_utils::ArrayUnrolledExt, keccak_f1600_permutation};
+use vectoreyes::array_utils::ArrayUnrolledExt;
 
 #[derive(Parser)]
 #[command(name = "keccak_zk")]
@@ -27,6 +30,21 @@ struct Cli {
 enum Commands {
     /// Compile Keccak_f circuit from bristol-fashion to SIEVE IR
     Compile {},
+
+    /// Transpile a Bristol Fashion circuit to SIEVE IR
+    Transpile {
+        /// Input Bristol Fashion circuit file
+        #[arg(short, long)]
+        input: PathBuf,
+
+        /// Output SIEVE IR file
+        #[arg(short, long)]
+        output: PathBuf,
+
+        /// Output format (text or binary)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
 // Helper functions for wire handling
@@ -399,5 +417,35 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Compile {} => compile_circuit(),
+        Commands::Transpile {
+            input,
+            output,
+            format,
+        } => {
+            println!("Transpiling Bristol Fashion circuit to SIEVE IR...");
+            println!("Input file: {}", input.display());
+            println!("Output file: {}", output.display());
+
+            if format != "text" && format != "binary" {
+                bail!(
+                    "Invalid output format: {}. Must be 'text' or 'binary'",
+                    format
+                );
+            }
+
+            // Transpile the circuit
+            transpiler::transpile(&input, &output)?;
+
+            println!("Successfully transpiled circuit to SIEVE IR");
+            println!("Output file generated: {}", output.display());
+
+            // TODO: Add binary format conversion when needed
+            if format == "binary" {
+                println!("Note: Binary format conversion is not yet implemented");
+                println!("The circuit has been output in text format");
+            }
+
+            Ok(())
+        }
     }
 }
