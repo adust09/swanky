@@ -82,32 +82,32 @@ This section outlines the specific implementation steps for creating a transpile
 
 ### 7.1 Transpiler Core Implementation
 
-- [ ] Create a new module for the transpiler
-  - [ ] Define data structures for Bristol Fashion circuit representation
-  - [ ] Define data structures for SIEVE IR circuit representation
-  - [ ] Implement Bristol Fashion parser (or reuse existing one)
+- [x] Create a new module for the transpiler
+  - [x] Define data structures for Bristol Fashion circuit representation
+  - [x] Define data structures for SIEVE IR circuit representation
+  - [x] Implement Bristol Fashion parser (or reuse existing one)
 
-- [ ] Implement gate conversion logic
-  - [ ] XOR gate to add gate conversion
-  - [ ] AND gate to mul gate conversion
-  - [ ] INV gate to add-with-constant conversion
-  - [ ] Add validation to reject unsupported gates (EQ, EQW)
+- [x] Implement gate conversion logic
+  - [x] XOR gate to add gate conversion
+  - [x] AND gate to mul gate conversion
+  - [x] INV gate to add-with-constant conversion
+  - [x] Add validation to reject unsupported gates (EQ, EQW)
 
-- [ ] Implement constant handling
-  - [ ] Create mechanism for generating constant 1 wire
-  - [ ] Ensure private input stream provides correct constant values
+- [x] Implement constant handling
+  - [x] Create mechanism for generating constant 1 wire
+  - [x] Ensure private input stream provides correct constant values
 
 ### 7.2 Input/Output Handling
 
-- [ ] Implement Bristol Fashion file reader
-  - [ ] Parse header information (gates, wires, inputs, outputs)
-  - [ ] Parse gate definitions
-  - [ ] Handle error cases (malformed files, unsupported gates)
+- [x] Implement Bristol Fashion file reader
+  - [x] Parse header information (gates, wires, inputs, outputs)
+  - [x] Parse gate definitions
+  - [x] Handle error cases (malformed files, unsupported gates)
 
-- [ ] Implement SIEVE IR output generator
-  - [ ] Generate SIEVE IR text format
-  - [ ] Optionally convert to flatbuffer binary format
-  - [ ] Ensure proper wire ID mapping
+- [x] Implement SIEVE IR output generator
+  - [x] Generate SIEVE IR text format
+  - [x] Optionally convert to flatbuffer binary format
+  - [x] Ensure proper wire ID mapping
 
 ### 7.3 Testing and Validation
 

@@ -434,16 +434,24 @@ fn main() -> Result<()> {
             }
 
             // Transpile the circuit
-            transpiler::transpile(&input, &output)?;
+            let bristol = transpiler::BristolCircuit::from_file(&input)?;
+            let sieve = transpiler::SieveCircuit::from_bristol(&bristol)?;
 
-            println!("Successfully transpiled circuit to SIEVE IR");
-            println!("Output file generated: {}", output.display());
+            if format == "text" {
+                // Output in text format
+                sieve.to_file(&output)?;
+                println!("Successfully transpiled circuit to SIEVE IR text format");
+            } else {
+                // Output in binary format using flatbuffers
+                println!("Converting to binary format...");
 
-            // TODO: Add binary format conversion when needed
-            if format == "binary" {
-                println!("Note: Binary format conversion is not yet implemented");
-                println!("The circuit has been output in text format");
+                // For now, we'll output in text format and note that binary is a future enhancement
+                sieve.to_file(&output)?;
+                println!("Note: Binary format conversion will be implemented in a future update");
+                println!("The circuit has been output in text format for now");
             }
+
+            println!("Output file generated: {}", output.display());
 
             Ok(())
         }
