@@ -1,0 +1,11 @@
+version 2.0.0;
+circuit;
+@type field 2;
+@begin
+  $0 <- @private(0);
+  $1 <- @private(0);
+  $2 <- @private(0);
+  $4 <- @add(0: $1, $2);
+  $5 <- @mul(0: $1, $2);
+  $6 <- @add(0: $2, $0);
+@end
