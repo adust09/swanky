@@ -1,67 +1,112 @@
-# Keccak Hash Function VOLE-in-the-Head Zero-Knowledge Proof
+# bristol-2-sieve
 
-This project demonstrates how to convert a Keccak hash function circuit from Bristol Fashion format to SIEVE IR, and then use it to generate a VOLE-in-the-Head zero-knowledge proof.
+bristol-2-sieve is a tool for converting circuits from Bristol Fashion format to SIEVE IR format, enabling their use with the schmivitz zero-knowledge proof system. It focuses particularly on compiling Keccak_f circuits and generating/verifying proofs.
 
 ## Overview
 
-The project consists of the following components:
+bristol-2-sieve provides the following functionality:
 
-1. **keccak_bristol_to_sieve.rs**: A Rust program that converts the Keccak hash function circuit from Bristol Fashion format to SIEVE IR.
-2. **schmivitz/src/bin/schmivitz-prover.rs**: A binary for generating VOLE-in-the-Head zero-knowledge proofs.
-3. **schmivitz/src/bin/schmivitz-verifier.rs**: A binary for verifying VOLE-in-the-Head zero-knowledge proofs.
-4. **generate_keccak_zkp.sh**: A shell script that orchestrates the entire process.
+1. Converting circuits from Bristol Fashion format to SIEVE IR format
+2. Specially optimized compilation of Keccak_f circuits
+3. Integration with the schmivitz VOLE-in-the-head zero-knowledge proof system
 
-## Prerequisites
+This tool is designed to efficiently generate zero-knowledge proofs for cryptographic circuits, especially Keccak_f.
 
-- Rust and Cargo
-- The Swanky cryptography library
-- The Bristol Fashion circuit for Keccak hash function (located at `bristol-fashion/circuits/Keccak_f.txt`)
-- The schmivitz library for VOLE-in-the-Head zero-knowledge proofs
+## Installation
+
+### Prerequisites
+
+- Rust 2021 Edition or later
+- Cargo
+
+### Installation Steps
+
+Clone the repository and build using Cargo:
+
+```bash
+git clone <repository-url>
+cd swanky
+cargo build --release -p bristol_2_sieve
+```
 
 ## Usage
 
-1. Make sure the script is executable:
-   ```
-   chmod +x generate_keccak_zkp.sh
-   ```
+bristol-2-sieve can be used as a command-line tool. There are two main commands:
 
-2. Run the script:
-   ```
-   ./generate_keccak_zkp.sh
-   ```
+### 1. Compiling Keccak_f Circuit
 
-The script will:
-1. Compile the Bristol Fashion to SIEVE IR converter
-2. Convert the Keccak hash function circuit to SIEVE IR
-3. Create sample input files for the proof
-4. Compile the SIEVE IR circuit with mac-n-cheese
-5. Compile the schmivitz binaries
-6. Generate a VOLE-in-the-Head zero-knowledge proof
-7. Verify the proof
+Compile the Keccak_f circuit from Bristol Fashion format to SIEVE IR format:
 
-## How It Works
+```bash
+./target/release/bristol_2_sieve compile
+```
 
-### Bristol Fashion to SIEVE IR Conversion
+This command generates the following files:
+- `keccak_f.bin` - The compiled circuit
+- `keccak_f.priv.bin` - Private input data
 
-The Bristol Fashion format represents circuits using gates like XOR, AND, INV, etc. The SIEVE IR format represents circuits using gates like Add, Mul, AddConstant, MulConstant, etc. The conversion process maps each Bristol Fashion gate to its equivalent SIEVE IR gate.
+### 2. Transpiling Any Bristol Fashion Circuit
 
-For example:
-- XOR gates in Bristol Fashion are converted to Add gates in SIEVE IR (since we're working in F2)
-- AND gates in Bristol Fashion are converted to Mul gates in SIEVE IR
-- INV gates in Bristol Fashion are converted to AddConstant gates with a constant of 1 in SIEVE IR
+Convert any Bristol Fashion circuit to SIEVE IR format:
 
-### VOLE-in-the-Head Zero-Knowledge Proofs
+```bash
+./target/release/bristol_2_sieve transpile --input <input-file> --output <output-file> [--format <text|binary>]
+```
 
-VOLE-in-the-Head is a technique for generating zero-knowledge proofs that is post-quantum secure. It uses Vector Oblivious Linear Evaluation (VOLE) to create proofs that are publicly verifiable and non-interactive.
+Parameters:
+- `--input` or `-i`: Input Bristol Fashion circuit file
+- `--output` or `-o`: Output SIEVE IR file
+- `--format` or `-f`: Output format (`text` or `binary`, default is `text`)
 
-The schmivitz library implements the VOLE-in-the-Head protocol as defined by Baum et al. in "Publicly Verifiable Zero-Knowledge and Post-Quantum Signatures from VOLE-in-the-head".
+Example:
 
-## Customization
+```bash
+./target/release/bristol_2_sieve transpile --input bristol-fashion/circuits/sha256.txt --output sha256.sieve --format text
+```
 
-You can customize the input to the Keccak hash function by modifying the `keccak_private.txt` file. The file contains 1600 bits (represented as 0s and 1s) that serve as the input to the Keccak hash function.
+## Supported Gates
 
-## References
+bristol-2-sieve supports the following gates:
 
-- [Bristol Fashion Circuit Format](https://homes.esat.kuleuven.be/~nsmart/MPC/)
-- [SIEVE IR Format](https://github.com/GaloisInc/swanky/tree/main/mac-n-cheese/sieve-parser)
-- [VOLE-in-the-Head: Publicly Verifiable Zero-Knowledge and Post-Quantum Signatures](https://eprint.iacr.org/2023/996)
+- XOR gates (converted to `add` gates in SIEVE IR)
+- AND gates (converted to `mul` gates in SIEVE IR)
+- INV gates (converted to `add` gates with a constant 1 wire)
+
+## Technical Details
+
+### Conversion Process
+
+1. Parsing Bristol Fashion Circuit
+   - Parsing header information (number of gates, wires, inputs, outputs)
+   - Parsing each gate definition
+
+2. Creating SIEVE IR Circuit
+   - Generating SIEVE IR header with appropriate type information (field F2)
+   - Creating a constant 1 wire for INV operations (using private input)
+   - Converting each gate according to mapping rules
+   - Handling input and output wires appropriately
+
+3. Outputting SIEVE IR
+   - Generating SIEVE IR text representation
+   - Optionally converting to flatbuffer binary format
+
+### Gate Mapping
+
+| Bristol Fashion Gate | SIEVE IR Equivalent | Implementation |
+|---------------------|---------------------|----------------|
+| XOR { a, b, out }   | add                 | `$out <- @add(0: $a, $b)` |
+| AND { a, b, out }   | mul                 | `$out <- @mul(0: $a, $b)` |
+| INV { a, out }      | add with constant 1 | `$out <- @add(0: $a, $one_wire)` |
+
+## Limitations
+
+- EQ and EQW gates are not directly supported
+- The conversion process may take time for large circuits (such as SHA-256 and Keccak-f)
+
+## Contributing
+
+Contributions to the project are welcome. Please feel free to submit bug reports, feature requests, or pull requests.
+
+## License
+
+This project is licensed under [project license].
