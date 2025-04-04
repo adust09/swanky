@@ -62,16 +62,19 @@ This document outlines the steps required to implement a system that compiles a 
 ## Command Examples
 
 ### Compile Circuit
+
 ```bash
 cargo run -- compile --input bristol-fashion/circuits/Keccak_f.txt --output-prefix keccak
 ```
 
 ### Generate Proof
+
 ```bash
 cargo run -- prove --circuit keccak.bin --private-input keccak_input.txt --output keccak_proof.bin
 ```
 
 ### Verify Proof
+
 ```bash
 cargo run -- verify --circuit keccak.bin --proof keccak_proof.bin
 ```

@@ -271,6 +271,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bristol_2_sieve"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "bristol-fashion",
+ "clap",
+ "crossbeam",
+ "eyre",
+ "mac-n-cheese-ir",
+ "mac-n-cheese-sieve-parser",
+ "merlin",
+ "num_cpus",
+ "rand",
+ "schmivitz",
+ "scuttlebutt",
+ "tempfile",
+ "vectoreyes",
+]
+
+[[package]]
 name = "bufstream"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1194,26 +1214,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecc2af9a1119c51f12a14607e783cb977bde58bc069ff0c3da1095e635d70654"
 dependencies = [
  "cpufeatures",
-]
-
-[[package]]
-name = "keccak-zk"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "bristol-fashion",
- "clap",
- "crossbeam",
- "eyre",
- "mac-n-cheese-ir",
- "mac-n-cheese-sieve-parser",
- "merlin",
- "num_cpus",
- "rand",
- "schmivitz",
- "scuttlebutt",
- "tempfile",
- "vectoreyes",
 ]
 
 [[package]]
