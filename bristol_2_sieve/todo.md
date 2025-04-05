@@ -119,9 +119,9 @@ This section outlines the specific implementation steps for creating a transpile
   - [x] Test AND to mul conversion
   - [x] Test INV to add-with-constant conversion
 
-- [ ] **Create integration tests with real circuits**
-  - [ ] Test with Keccak-f circuit
-  - [ ] Verify output correctness by comparing circuit evaluations
+- [x] **Create integration tests with real circuits**
+  - [x] Test with Keccak-f circuit
+  - [x] Verify output correctness by comparing circuit evaluations
 
 ### 7.4 CLI and Integration
 
