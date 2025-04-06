@@ -498,22 +498,6 @@ fn test_keccak_f_circuit(input_path: &Path, private_input_path: &Path) -> Result
     println!("Circuit evaluation complete");
     println!("Output size: {} bits", output_values.len());
 
-    // Save the output values to a file for verification
-    let mut output_file = std::fs::File::create("test_keccak_f_output.txt")?;
-    writeln!(output_file, "# Keccak-f Circuit Output")?;
-    writeln!(output_file, "# Input: All 1's")?;
-    writeln!(output_file, "# Output size: {}", output_values.len())?;
-    writeln!(output_file, "")?;
-
-    for (i, &value) in output_values.iter().enumerate() {
-        writeln!(
-            output_file,
-            "Output[{}] = {}",
-            i,
-            if value { "1" } else { "0" }
-        )?;
-    }
-
     // Step 5: Verify the circuit structure
     println!("Verifying circuit structure...");
     assert_eq!(bristol.num_gates, 192086, "Incorrect number of gates");
