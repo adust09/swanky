@@ -70,6 +70,46 @@ fn main() -> eyre::Result<()> {
 }
 ```
 
+### Using the Bristol to Sieve Transpiler
+
+You can also use the Bristol to Sieve transpiler directly in your Rust code:
+
+```rust
+use bristol_2_sieve::transpile;
+
+fn main() -> eyre::Result<()> {
+    // Specify paths to your Bristol circuit and output Sieve file
+    let bristol_path = "path/to/your/circuit.txt";
+    let sieve_output_path = "path/to/output/sieve_circuit.txt";
+    
+    // Convert Bristol format to Sieve format
+    transpile(bristol_path, sieve_output_path)?;
+    
+    println!("Circuit successfully converted to Sieve format!");
+    Ok(())
+}
+```
+
+If you need more control over the conversion process, you can use the lower-level API:
+
+```rust
+use bristol_2_sieve::transpiler::{BristolCircuit, SieveCircuit};
+
+fn main() -> eyre::Result<()> {
+    // Parse Bristol Fashion circuit
+    let bristol = BristolCircuit::from_file("path/to/your/circuit.txt")?;
+    
+    // Convert to SIEVE IR
+    let sieve = SieveCircuit::from_bristol(&bristol)?;
+    
+    // Write SIEVE IR to file
+    sieve.to_file("path/to/output/sieve_circuit.txt")?;
+    
+    println!("Circuit successfully converted to Sieve format!");
+    Ok(())
+}
+```
+
 ## Library Features
 
 Schmivitz implements a protocol defined by Baum et al. in _Publicly Verifiable Zero-Knowledge and Post-Quantum Signatures from VOLE-in-the-head_. Specifically, it implements the zero-knowledge protocol for degree-2 relations over small- to medium-sized fields.
@@ -172,6 +212,46 @@ fn main() -> eyre::Result<()> {
     prove_and_verify_bristol(bristol_path, private_input_path, &mut rng)?;
     
     println!("証明が正常に生成され、検証されました！");
+    Ok(())
+}
+```
+
+### Bristol から Sieve へのトランスパイラの使用
+
+Rustコードで Bristol から Sieve へのトランスパイラを直接使用することもできます：
+
+```rust
+use bristol_2_sieve::transpile;
+
+fn main() -> eyre::Result<()> {
+    // Bristol回路と出力Sieveファイルへのパスを指定
+    let bristol_path = "path/to/your/circuit.txt";
+    let sieve_output_path = "path/to/output/sieve_circuit.txt";
+    
+    // Bristol形式からSieve形式に変換
+    transpile(bristol_path, sieve_output_path)?;
+    
+    println!("回路がSieve形式に正常に変換されました！");
+    Ok(())
+}
+```
+
+変換プロセスをより詳細に制御する必要がある場合は、低レベルAPIを使用できます：
+
+```rust
+use bristol_2_sieve::transpiler::{BristolCircuit, SieveCircuit};
+
+fn main() -> eyre::Result<()> {
+    // Bristol Fashion回路を解析
+    let bristol = BristolCircuit::from_file("path/to/your/circuit.txt")?;
+    
+    // SIEVE IRに変換
+    let sieve = SieveCircuit::from_bristol(&bristol)?;
+    
+    // SIEVE IRをファイルに書き込み
+    sieve.to_file("path/to/output/sieve_circuit.txt")?;
+    
+    println!("回路がSieve形式に正常に変換されました！");
     Ok(())
 }
 ```
