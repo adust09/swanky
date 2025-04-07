@@ -4,8 +4,6 @@ use eyre::{bail, Result};
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
-    fs::File,
-    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
