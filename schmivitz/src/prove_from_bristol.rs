@@ -15,47 +15,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use bristol_2_sieve::transpile;
+
 use crate::{vole::insecure::InsecureVole, Proof};
-/// Converts a Bristol format circuit to a Sieve format circuit using the bristol_2_sieve command line tool.
-///
-/// # Arguments
-///
-/// * `bristol_path` - Path to the Bristol format circuit file
-/// * `output_path` - Path to save the converted Sieve format circuit
-///
-/// # Returns
-///
-/// Result indicating whether the conversion was successful
-pub fn convert_bristol_to_sieve<P1: AsRef<Path>, P2: AsRef<Path>>(
-    bristol_path: P1,
-    output_path: P2,
-) -> Result<()> {
-    // Get the absolute paths
-    let bristol_path = bristol_path.as_ref().to_path_buf();
-    let output_path = output_path.as_ref().to_path_buf();
 
-    // Run the bristol_2_sieve command line tool
-    let status = std::process::Command::new("cargo")
-        .args([
-            "run",
-            "--bin",
-            "bristol_2_sieve",
-            "--",
-            "transpile",
-            "-i",
-            &bristol_path.to_string_lossy(),
-            "-o",
-            &output_path.to_string_lossy(),
-        ])
-        .current_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap())
-        .status()?;
-
-    if !status.success() {
-        bail!("Failed to run bristol_2_sieve transpiler: {}", status);
-    }
-
-    Ok(())
-}
 /// Preprocesses the circuit file to make it compatible with the Schmivitz library.
 ///
 /// # Arguments
@@ -222,7 +185,7 @@ where
     let converted_circuit_path = output_dir.join("converted_circuit.txt");
 
     // Convert the Bristol format to Sieve format
-    convert_bristol_to_sieve(bristol_path, &converted_circuit_path)?;
+    transpile(bristol_path, &converted_circuit_path)?;
 
     // Execute the prove and verify cycle
     let proof = prove_sieve(&converted_circuit_path, private_input_path, rng)?;
@@ -303,7 +266,7 @@ mod tests {
         let output_path = output_dir.join("test_converted_circuit.txt");
 
         // Convert the Bristol format to Sieve format
-        convert_bristol_to_sieve(bristol_path, &output_path)?;
+        transpile(bristol_path, &output_path)?;
 
         // Verify that the output file exists
         assert!(output_path.exists());

@@ -304,7 +304,6 @@ dependencies = [
  "merlin",
  "num_cpus",
  "rand",
- "schmivitz",
  "scuttlebutt",
  "tempfile",
  "vectoreyes",
@@ -2243,6 +2242,7 @@ name = "schmivitz"
 version = "0.6.0"
 dependencies = [
  "blake3",
+ "bristol_2_sieve",
  "clap 2.34.0",
  "eyre",
  "generic-array 1.2.0",
