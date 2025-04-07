@@ -21,6 +21,7 @@ version.workspace = true
 
 [dependencies]
 blake3.workspace = true
+clap = "2.33"
 eyre.workspace = true
 generic-array = { version = "1.2.0", features = ["serde"] }
 mac-n-cheese-sieve-parser.workspace = true
@@ -38,3 +39,7 @@ tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "bristol_prover"
+path = "src/bin/bristol_prover.rs"

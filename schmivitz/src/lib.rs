@@ -19,8 +19,10 @@
 mod all_but_one_vc;
 pub mod parameters;
 mod proof;
+pub mod prove_from_bristol;
 mod vole;
 
 pub use proof::Proof;
+pub use prove_from_bristol::{cli_main, prove_and_verify_bristol, prove_sieve, verify_sieve};
 pub use vole::insecure;
 pub use vole::RandomVole;
