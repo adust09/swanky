@@ -402,16 +402,21 @@ impl SieveCircuit {
             wire_map.insert(input_wire, input_wires[i]);
         }
 
-        // For the test circuit, preserve all original wire IDs
-        // For real circuits, we would need a more sophisticated approach to prevent collisions
+        // Use a more sophisticated approach to prevent wire ID collisions
+        // Start assigning gate output wires from a high number to avoid collisions with input wires
+        let mut next_wire_id = current_wire + bristol.gates.len(); // Start from a safe high number
 
-        // Map all gate output wires to their original IDs
+        // Map all gate output wires to new unique IDs
         for gate in &bristol.gates {
             match gate {
                 BristolGate::Xor { output, .. }
                 | BristolGate::And { output, .. }
                 | BristolGate::Inv { output, .. } => {
-                    wire_map.insert(*output, *output);
+                    // Check if this output wire ID is already mapped (e.g., it's an input wire)
+                    if !wire_map.contains_key(output) {
+                        wire_map.insert(*output, next_wire_id);
+                        next_wire_id += 1;
+                    }
                 }
             }
         }

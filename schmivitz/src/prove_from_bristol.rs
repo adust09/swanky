@@ -86,9 +86,15 @@ fn preprocess_circuit<P: AsRef<Path>>(circuit_path: P) -> Result<Cursor<Vec<u8>>
             }
         }
     }
+    // More robust handling of @end tag
     if circuit_content.contains("@end") {
         if let Some(end_pos) = circuit_content.find("@end") {
+            // Remove everything from @end onwards
             circuit_content = circuit_content[..end_pos].to_string();
+            // Ensure the content ends with a newline
+            if !circuit_content.ends_with('\n') {
+                circuit_content.push('\n');
+            }
         }
     }
 
