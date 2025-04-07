@@ -1,8 +1,9 @@
-//! Implementation of Keccak-F function for VOLE-in-the-head proofs.
+//! Implementation of Bristol circuit proofs for VOLE-in-the-head.
 //!
-//! This module provides functionality to prove and verify Keccak-F computations
-//! using the VOLE-in-the-head protocol.
+//! This module provides functionality to prove and verify computations from Bristol format circuits
+//! using the VOLE-in-the-head protocol. It supports flexible circuit and input specification.
 
+use clap::{App, Arg, SubCommand};
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::text_parser::RelationReader;
 use merlin::Transcript;
@@ -55,11 +56,11 @@ pub fn convert_bristol_to_sieve<P1: AsRef<Path>, P2: AsRef<Path>>(
 
     Ok(())
 }
-/// Preprocesses the Keccak-F circuit file to make it compatible with the Schmivitz library.
+/// Preprocesses the circuit file to make it compatible with the Schmivitz library.
 ///
 /// # Arguments
 ///
-/// * `circuit_path` - Path to the Keccak-F circuit file
+/// * `circuit_path` - Path to the circuit file
 ///
 /// # Returns
 ///
@@ -107,11 +108,11 @@ fn preprocess_circuit<P: AsRef<Path>>(circuit_path: P) -> Result<Cursor<Vec<u8>>
     Ok(cursor)
 }
 
-/// Loads the Keccak-F circuit from the provided file path and validates its format.
+/// Loads the circuit from the provided file path and validates its format.
 ///
 /// # Arguments
 ///
-/// * `circuit_path` - Path to the Keccak-F sieve output file
+/// * `circuit_path` - Path to the sieve output file
 ///
 /// # Returns
 ///
@@ -134,17 +135,17 @@ fn load_sieve_circuit<P: AsRef<Path>>(circuit_path: P) -> Result<Cursor<Vec<u8>>
     Ok(cursor)
 }
 
-/// Proves a Keccak-F computation using the VOLE-in-the-head protocol.
+/// Proves a computation using the VOLE-in-the-head protocol.
 ///
 /// # Arguments
 ///
-/// * `circuit_path` - Path to the Keccak-F sieve output file
+/// * `circuit_path` - Path to the sieve output file
 /// * `private_input_path` - Path to the private input file
 /// * `rng` - Random number generator
 ///
 /// # Returns
 ///
-/// A proof of the Keccak-F computation
+/// A proof of the computation
 pub fn prove_sieve<R, P1, P2>(
     circuit_path: P1,
     private_input_path: P2,
@@ -155,11 +156,11 @@ where
     P1: AsRef<Path>,
     P2: AsRef<Path>,
 {
-    // Load and validate the Keccak-F circuit
+    // Load and validate the circuit
     let mut circuit = load_sieve_circuit(circuit_path)?;
 
     // Create a new transcript
-    let mut transcript = Transcript::new(b"keccak_f_proof");
+    let mut transcript = Transcript::new(b"bristol_circuit_proof");
 
     // Generate the proof
     Proof::prove(
@@ -170,44 +171,44 @@ where
     )
 }
 
-/// Verifies a Keccak-F computation proof.
+/// Verifies a computation proof.
 ///
 /// # Arguments
 ///
 /// * `proof` - The proof to verify
-/// * `circuit_path` - Path to the Keccak-F sieve output file
+/// * `circuit_path` - Path to the sieve output file
 ///
 /// # Returns
 ///
 /// Result indicating whether the proof is valid
-pub fn verify_keccak_f<P: AsRef<Path>>(proof: &Proof<InsecureVole>, circuit_path: P) -> Result<()> {
-    // Load and validate the Keccak-F circuit
+pub fn verify_sieve<P: AsRef<Path>>(proof: &Proof<InsecureVole>, circuit_path: P) -> Result<()> {
+    // Load and validate the circuit
     let mut circuit = load_sieve_circuit(circuit_path)?;
 
     // Create a new transcript
-    let mut transcript = Transcript::new(b"keccak_f_proof");
+    let mut transcript = Transcript::new(b"bristol_circuit_proof");
 
     // Verify the proof
     proof.verify(&mut circuit, &mut transcript)
 }
-
-/// Executes a complete prove and verify cycle for Keccak-F.
+/// Executes a complete prove and verify cycle for a Bristol format circuit.
 ///
-/// This function demonstrates how to use the Keccak-F proof system by:
-/// 1. Generating a proof using the provided circuit and private input
-/// 2. Verifying the generated proof
+/// This function demonstrates how to use the proof system with a Bristol format circuit:
+/// 1. Converts the Bristol format circuit to Sieve format
+/// 2. Generates a proof using the converted circuit and private input
+/// 3. Verifies the generated proof
 ///
 /// # Arguments
 ///
-/// * `circuit_path` - Path to the Keccak-F sieve output file
+/// * `bristol_path` - Path to the Bristol format circuit file
 /// * `private_input_path` - Path to the private input file
 /// * `rng` - Random number generator
 ///
 /// # Returns
 ///
 /// Result indicating whether the proof was successfully generated and verified
-pub fn prove_and_verify<R, P1, P2>(
-    circuit_path: P1,
+pub fn prove_and_verify_bristol<R, P1, P2>(
+    bristol_path: P1,
     private_input_path: P2,
     rng: &mut R,
 ) -> Result<()>
@@ -216,53 +217,71 @@ where
     P1: AsRef<Path>,
     P2: AsRef<Path>,
 {
-    // Generate the proof
-    let proof = prove_sieve(&circuit_path, &private_input_path, rng)?;
-
-    // Verify the proof
-    verify_keccak_f(&proof, circuit_path)
-}
-
-/// Executes a complete prove and verify cycle for Keccak-F using the bristol_2_sieve circuit.
-///
-/// This function demonstrates how to use the Keccak-F proof system with the actual Keccak-F circuit:
-/// 1. Converts the Bristol format circuit to Sieve format
-/// 2. Generates a proof using the converted circuit and private input
-/// 3. Verifies the generated proof
-///
-/// # Arguments
-///
-/// * `rng` - Random number generator
-///
-/// # Returns
-///
-/// Result indicating whether the proof was successfully generated and verified
-pub fn prove_and_verify_bristol<R>(rng: &mut R) -> Result<()>
-where
-    R: CryptoRng + RngCore,
-{
-    // Paths to the Bristol format circuit and private input
-    let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let bristol_path = project_root.join("bristol_2_sieve/src/keccak_f.txt");
-    let private_input_path = project_root.join("bristol_2_sieve/src/keccak_private_input.txt");
-
     // Create a temporary directory for the converted circuit
     let output_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let converted_circuit_path = output_dir.join("converted_keccak_f.txt");
+    let converted_circuit_path = output_dir.join("converted_circuit.txt");
 
     // Convert the Bristol format to Sieve format
     convert_bristol_to_sieve(bristol_path, &converted_circuit_path)?;
 
     // Execute the prove and verify cycle
-    let result = prove_and_verify(&converted_circuit_path, private_input_path, rng);
-
-    // Don't clean up the temporary file for debugging
-    // std::fs::remove_file(converted_circuit_path)?;
-
+    let proof = prove_sieve(&converted_circuit_path, private_input_path, rng)?;
+    let result = verify_sieve(&proof, converted_circuit_path);
     result
+}
+
+/// Command-line interface for proving and verifying Bristol format circuits.
+///
+/// This function parses command-line arguments and executes the appropriate actions.
+///
+/// # Returns
+///
+/// Result indicating whether the operation was successful
+pub fn cli_main() -> Result<()> {
+    let matches = App::new("Bristol Circuit Prover")
+        .version("1.0")
+        .author("Swanky Team")
+        .about("Proves and verifies computations using Bristol format circuits")
+        .subcommand(
+            SubCommand::with_name("prove")
+                .about("Proves a computation using a Bristol format circuit")
+                .arg(
+                    Arg::with_name("bristol_path")
+                        .short("b")
+                        .long("bristol")
+                        .value_name("FILE")
+                        .help("Path to the Bristol format circuit file")
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("private_input_path")
+                        .short("p")
+                        .long("private-input")
+                        .value_name("FILE")
+                        .help("Path to the private input file")
+                        .required(true),
+                ),
+        )
+        .get_matches();
+
+    if let Some(matches) = matches.subcommand_matches("prove") {
+        let bristol_path = matches.value_of("bristol_path").unwrap();
+        let private_input_path = matches.value_of("private_input_path").unwrap();
+
+        println!("Using Bristol circuit: {}", bristol_path);
+        println!("Using private input: {}", private_input_path);
+
+        // Create a random number generator
+        let mut rng = rand::thread_rng();
+
+        // Execute the prove and verify cycle
+        prove_and_verify_bristol(bristol_path, private_input_path, &mut rng)?;
+        println!("Proof successfully generated and verified!");
+    } else {
+        println!("No subcommand specified. Use --help for usage information.");
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -281,7 +300,7 @@ mod tests {
 
         // Create a temporary output path
         let output_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-        let output_path = output_dir.join("converted_keccak_f.txt");
+        let output_path = output_dir.join("test_converted_circuit.txt");
 
         // Convert the Bristol format to Sieve format
         convert_bristol_to_sieve(bristol_path, &output_path)?;
@@ -297,10 +316,18 @@ mod tests {
 
     #[test]
     fn test_keccak_f_bristol_proof() -> Result<()> {
+        // Paths to the test files
+        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let bristol_path = project_root.join("bristol_2_sieve/src/keccak_f.txt");
+        let private_input_path = project_root.join("bristol_2_sieve/src/keccak_private_input.txt");
+
         // Create a random number generator
         let mut rng = thread_rng();
 
         // Execute the prove and verify cycle with the Bristol circuit
-        prove_and_verify_bristol(&mut rng)
+        prove_and_verify_bristol(bristol_path, private_input_path, &mut rng)
     }
 }
