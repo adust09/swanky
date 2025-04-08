@@ -1,5 +1,5 @@
 [package]
-name = "bristol_2_sieve"
+name = "bristol2sieve"
 version = "0.1.0"
 edition = "2021"
 description = "A tool for compiling Keccak_f circuit from bristol-fashion to mac-n-cheese and generating/verifying proofs with schmivitz"
@@ -8,7 +8,7 @@ description = "A tool for compiling Keccak_f circuit from bristol-fashion to mac
 path = "src/lib.rs"
 
 [[bin]]
-name = "bristol_2_sieve"
+name = "bristol2sieve"
 path = "src/main.rs"
 
 # No features needed since we removed the schmivitz dependency

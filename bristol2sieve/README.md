@@ -8,7 +8,7 @@ Add the crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bristol_2_sieve = { path = "../bristol_2_sieve" }
+bristol2sieve = { path = "../bristol2sieve" }
 ```
 
 ## Command-line Usage
@@ -16,14 +16,14 @@ bristol_2_sieve = { path = "../bristol_2_sieve" }
 To convert a Bristol Fashion circuit to SIEVE IR format using the command-line tool:
 
 ```bash
-cargo run --bin bristol_2_sieve -- transpile -i path/to/bristol_circuit.txt -o path/to/output_sieve_circuit.txt
+cargo run --bin bristol2sieve -- transpile -i path/to/bristol_circuit.txt -o path/to/output_sieve_circuit.txt
 ```
 
 ### Command-line Options
 
 ```
 USAGE:
-    bristol_2_sieve transpile --input <FILE> --output <FILE> [--format <FORMAT>]
+    bristol2sieve transpile --input <FILE> --output <FILE> [--format <FORMAT>]
 
 FLAGS:
     -h, --help       Prints help information
@@ -42,7 +42,7 @@ You can also use the library programmatically in your Rust code:
 ### Simple Usage
 
 ```rust
-use bristol_2_sieve::transpile;
+use bristol2sieve::transpile;
 use eyre::Result;
 
 fn main() -> Result<()> {
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
 If you need more control over the conversion process, you can use the lower-level API:
 
 ```rust
-use bristol_2_sieve::transpiler::{BristolCircuit, SieveCircuit};
+use bristol2sieve::transpiler::{BristolCircuit, SieveCircuit};
 use eyre::Result;
 
 fn main() -> Result<()> {
@@ -83,10 +83,10 @@ fn main() -> Result<()> {
 
 ## Integration with Schmivitz
 
-The bristol_2_sieve transpiler can be used together with the schmivitz library to prove and verify computations using Bristol format circuits:
+The bristol2sieve transpiler can be used together with the schmivitz library to prove and verify computations using Bristol format circuits:
 
 ```rust
-use bristol_2_sieve::transpile;
+use bristol2sieve::transpile;
 use schmivitz::prove_and_verify_bristol;
 use rand::thread_rng;
 use eyre::Result;

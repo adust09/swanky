@@ -26,7 +26,7 @@ Clone the repository and build using Cargo:
 ```bash
 git clone <repository-url>
 cd swanky
-cargo build --release -p bristol_2_sieve
+cargo build --release -p bristol2sieve
 ```
 
 ## Usage
@@ -38,7 +38,7 @@ bristol-2-sieve can be used as a command-line tool. There are two main commands:
 Compile the Keccak_f circuit from Bristol Fashion format to SIEVE IR format:
 
 ```bash
-./target/release/bristol_2_sieve compile
+./target/release/bristol2sieve compile
 ```
 
 This command generates the following files:
@@ -50,7 +50,7 @@ This command generates the following files:
 Convert any Bristol Fashion circuit to SIEVE IR format:
 
 ```bash
-./target/release/bristol_2_sieve transpile --input <input-file> --output <output-file> [--format <text|binary>]
+./target/release/bristol2sieve transpile --input <input-file> --output <output-file> [--format <text|binary>]
 ```
 
 Parameters:
@@ -61,7 +61,7 @@ Parameters:
 Example:
 
 ```bash
-./target/release/bristol_2_sieve transpile --input bristol-fashion/circuits/sha256.txt --output sha256.sieve --format text
+./target/release/bristol2sieve transpile --input bristol-fashion/circuits/sha256.txt --output sha256.sieve --format text
 ```
 
 ## Supported Gates

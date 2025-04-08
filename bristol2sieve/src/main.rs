@@ -6,7 +6,7 @@ use std::path::PathBuf;
 mod transpiler;
 
 #[derive(Parser)]
-#[command(name = "bristol_2_sieve")]
+#[command(name = "bristol2sieve")]
 #[command(about = "Converts Bristol format circuits to SIEVE IR")]
 struct Cli {
     #[command(subcommand)]

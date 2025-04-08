@@ -44,7 +44,7 @@ OPTIONS:
 To prove a computation using the Keccak-F circuit:
 
 ```bash
-bristol_prover prove --bristol bristol_2_sieve/src/keccak_f.txt --private-input bristol_2_sieve/src/keccak_private_input.txt
+bristol_prover prove --bristol bristol2sieve/src/keccak_f.txt --private-input bristol2sieve/src/keccak_private_input.txt
 ```
 
 ### Programmatic Usage
@@ -75,7 +75,7 @@ fn main() -> eyre::Result<()> {
 You can also use the Bristol to Sieve transpiler directly in your Rust code:
 
 ```rust
-use bristol_2_sieve::transpile;
+use bristol2sieve::transpile;
 
 fn main() -> eyre::Result<()> {
     // Specify paths to your Bristol circuit and output Sieve file
@@ -93,7 +93,7 @@ fn main() -> eyre::Result<()> {
 If you need more control over the conversion process, you can use the lower-level API:
 
 ```rust
-use bristol_2_sieve::transpiler::{BristolCircuit, SieveCircuit};
+use bristol2sieve::transpiler::{BristolCircuit, SieveCircuit};
 
 fn main() -> eyre::Result<()> {
     // Parse Bristol Fashion circuit
@@ -190,7 +190,7 @@ bristol_prover prove --bristol <Bristol回路ファイルへのパス> --private
 Keccak-F回路を使用して計算を証明するには：
 
 ```bash
-bristol_prover prove --bristol bristol_2_sieve/src/keccak_f.txt --private-input bristol_2_sieve/src/keccak_private_input.txt
+bristol_prover prove --bristol bristol2sieve/src/keccak_f.txt --private-input bristol2sieve/src/keccak_private_input.txt
 ```
 
 ### プログラムでの使用
@@ -221,7 +221,7 @@ fn main() -> eyre::Result<()> {
 Rustコードで Bristol から Sieve へのトランスパイラを直接使用することもできます：
 
 ```rust
-use bristol_2_sieve::transpile;
+use bristol2sieve::transpile;
 
 fn main() -> eyre::Result<()> {
     // Bristol回路と出力Sieveファイルへのパスを指定
@@ -239,7 +239,7 @@ fn main() -> eyre::Result<()> {
 変換プロセスをより詳細に制御する必要がある場合は、低レベルAPIを使用できます：
 
 ```rust
-use bristol_2_sieve::transpiler::{BristolCircuit, SieveCircuit};
+use bristol2sieve::transpiler::{BristolCircuit, SieveCircuit};
 
 fn main() -> eyre::Result<()> {
     // Bristol Fashion回路を解析

@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use bristol_2_sieve::transpile;
+use bristol2sieve::transpile;
 
 use crate::{vole::insecure::InsecureVole, Proof};
 
@@ -285,7 +285,7 @@ mod tests {
             .unwrap()
             .to_path_buf();
         let bristol_path = project_root.join("bristol-fashion/circuits/Keccak_f.txt");
-        let private_input_path = project_root.join("bristol_2_sieve/src/keccak_private_input.txt");
+        let private_input_path = project_root.join("bristol2sieve/src/keccak_private_input.txt");
 
         // Create a random number generator
         let mut rng = thread_rng();
