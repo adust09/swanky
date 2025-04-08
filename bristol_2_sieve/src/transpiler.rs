@@ -826,7 +826,7 @@ mod tests {
     #[test]
     fn test_with_keccak_f_circuit() {
         // Path to the Keccak_f circuit file
-        let input_path = "src/keccak_f.txt";
+        let input_path = "../bristol-fashion/circuits/keccak_f.txt";
 
         // Parse the Bristol Fashion circuit
         let bristol =
