@@ -582,16 +582,16 @@ mod tests {
         assert_eq!(sieve.gates.len(), 6); // 1 constant + 2 inputs + 3 gates
         assert_eq!(sieve.constant_one_wire, 0);
         assert_eq!(sieve.input_wires, vec![1, 2]);
-        assert_eq!(sieve.output_wires, vec![6]);
+        assert_eq!(sieve.output_wires, vec![8]);
 
         // Check the SIEVE IR text representation
         let sieve_text = sieve.to_string();
         assert!(sieve_text.contains("version 2.0.0;"));
         assert!(sieve_text.contains("@type field 2;"));
         assert!(sieve_text.contains("$0 <- @private(0);"));
-        assert!(sieve_text.contains("$4 <- @add(0: $1, $2);"));
-        assert!(sieve_text.contains("$5 <- @mul(0: $1, $2);"));
-        assert!(sieve_text.contains("$6 <- @add(0: $2, $0);"));
+        assert!(sieve_text.contains("$6 <- @add(0: $1, $2);"));
+        assert!(sieve_text.contains("$7 <- @mul(0: $1, $2);"));
+        assert!(sieve_text.contains("$8 <- @add(0: $2, $0);"));
     }
 
     #[test]
@@ -611,7 +611,7 @@ mod tests {
         let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
 
         // Create a file in the project directory
-        let output_path = "test_sieve_output.txt";
+        let output_path = "output/test_sieve.txt";
 
         // Write to file
         sieve.to_file(output_path).unwrap();
@@ -628,9 +628,9 @@ mod tests {
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
-        assert!(content.contains("$4 <- @add(0: $1, $2);"));
-        assert!(content.contains("$5 <- @mul(0: $1, $2);"));
-        assert!(content.contains("$6 <- @add(0: $2, $0);"));
+        assert!(content.contains("$6 <- @add(0: $1, $2);"));
+        assert!(content.contains("$7 <- @mul(0: $1, $2);"));
+        assert!(content.contains("$8 <- @add(0: $2, $0);"));
         assert!(content.contains("@end"));
 
         // Print the absolute path of the file for easy access
@@ -656,11 +656,12 @@ mod tests {
 1 1 1 6 INV"#;
 
         // Create input file in the project directory
-        let input_path = "test_bristol_input.txt";
+        // todo: should make this a temp file
+        let input_path = "test/test_bristol_input.txt";
         std::fs::write(input_path, bristol_str).unwrap();
 
         // Create output file path in the project directory
-        let output_path = "test_sieve_output2.txt";
+        let output_path = "output/test_sieve_output2.txt";
 
         // Run the transpile function
         transpile(input_path, output_path).unwrap();
@@ -677,9 +678,9 @@ mod tests {
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
-        assert!(content.contains("$4 <- @add(0: $1, $2);"));
-        assert!(content.contains("$5 <- @mul(0: $1, $2);"));
-        assert!(content.contains("$6 <- @add(0: $2, $0);"));
+        assert!(content.contains("$6 <- @add(0: $1, $2);"));
+        assert!(content.contains("$7 <- @mul(0: $1, $2);"));
+        assert!(content.contains("$8 <- @add(0: $2, $0);"));
         assert!(content.contains("@end"));
 
         // Print the absolute paths of the files for easy access
@@ -699,8 +700,8 @@ mod tests {
         );
 
         // Note: We're not deleting the files so they can be inspected after the test
-        // std::fs::remove_file(input_path).unwrap();
-        // std::fs::remove_file(output_path).unwrap();
+        std::fs::remove_file(input_path).unwrap();
+        std::fs::remove_file(output_path).unwrap();
     }
 
     #[test]
@@ -826,7 +827,7 @@ mod tests {
     #[test]
     fn test_with_keccak_f_circuit() {
         // Path to the Keccak_f circuit file
-        let input_path = "../bristol-fashion/circuits/keccak_f.txt";
+        let input_path = "../bristol-fashion/circuits/Keccak_f.txt";
 
         // Parse the Bristol Fashion circuit
         let bristol =
@@ -858,7 +859,7 @@ mod tests {
         );
 
         // Create a temporary output file for the SIEVE IR
-        let output_path = "test_keccak_f_sieve_output.txt";
+        let output_path = "output/test_keccak_f_sieve.txt";
 
         // Write SIEVE IR to file
         sieve
@@ -904,7 +905,7 @@ mod tests {
         assert!(has_mul_gate, "No mul gates found in output");
 
         // Clean up the test file
-        // std::fs::remove_file(output_path).expect("Failed to remove test output file");
+        std::fs::remove_file(output_path).expect("Failed to remove test output file");
 
         println!("Successfully tested transpiler with Keccak_f circuit");
     }
