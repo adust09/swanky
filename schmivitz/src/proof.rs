@@ -10,7 +10,7 @@
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, RngCore};
 use std::{
     io::{Read, Seek},
     iter::zip,
@@ -290,22 +290,6 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses");
         }
         Ok(())
-    }
-
-    #[cfg(feature = "snark")]
-    pub fn to_snark<R: Rng>(
-        &self,
-        validation_aggregation: &F128b,
-        rng: &mut R,
-    ) -> Result<(SnarkProof, SnarkKeys)> {
-        let keys = setup(rng)?;
-        let snark_proof = prove(self, validation_aggregation, &keys, rng)?;
-        Ok((snark_proof, keys))
-    }
-    #[cfg(feature = "snark")]
-    /// Verify a SNARK proof
-    pub fn verify_snark(snark_proof: &SnarkProof, keys: &SnarkKeys) -> Result<bool> {
-        verify(snark_proof, keys)
     }
 }
 

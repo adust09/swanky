@@ -6,7 +6,6 @@ description = "SNARK wrapper for VOLE in the Head verification"
 license = "MIT"
 
 [dependencies]
-schmivitz = { path = "../schmivitz" }
 ark-ff = "0.4.0"
 ark-ec = "0.4.0"
 ark-std = "0.4.0"

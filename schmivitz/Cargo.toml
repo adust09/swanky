@@ -36,7 +36,7 @@ vectoreyes.workspace = true
 
 [features]
 default = []
-snark = ["schmivitz-snark"]
+snark = []
 
 [dev-dependencies]
 rand.workspace = true

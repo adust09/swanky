@@ -2557,7 +2557,6 @@ dependencies = [
  "eyre",
  "merlin",
  "rand",
- "schmivitz",
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",
