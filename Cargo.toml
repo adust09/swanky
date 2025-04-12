@@ -26,7 +26,8 @@ members = [
   "simple-arith-circuit",
   "vectoreyes",
   "zkv",
-  "bristol2sieve",
+  "bristol2sieve", 
+  "schmivitz-snark",
 ]
 
 [workspace.package]
@@ -80,6 +81,7 @@ web-mac-n-cheese-wasm = { path = "diet-mac-and-cheese/web-mac-and-cheese/wasm" }
 web-mac-n-cheese-websocket = { path = "diet-mac-and-cheese/web-mac-and-cheese/websocket" }
 zkv = { path = "zkv" }
 bristol2sieve = { path = "bristol2sieve" }
+schmivitz-snark = { path = "schmivitz-snark" }
 # END OUR CRATES
 # Don't remove, or modify, the above "# END OUR CRATES" line. It's used by ./swanky new-crate
 
