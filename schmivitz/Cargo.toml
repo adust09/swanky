@@ -34,6 +34,10 @@ swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
 vectoreyes.workspace = true
 
+[features]
+default = []
+snark = ["schmivitz-snark"]
+
 [dev-dependencies]
 rand.workspace = true
 tempfile.workspace = true
