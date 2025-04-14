@@ -2,7 +2,10 @@ use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
+use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::Result;
+use std::fs;
+use std::path::Path;
 use swanky_field_binary::{F128b, F64b, F8b};
 
 use crate::{
@@ -56,6 +59,20 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
 
     let (proving_key, verification_key) =
         Groth16::<Bn254>::circuit_specific_setup(dummy_circuit, rng)?;
+
+    // Generate and output Solidity verifier at setup time
+    let output_dir = Path::new("solidity_output");
+    if !output_dir.exists() {
+        fs::create_dir_all(output_dir)?;
+    }
+
+    // Generate the Solidity verifier using the SolidityVerifier trait
+    let solidity_verifier = Groth16::<Bn254>::export(&verification_key);
+
+    // Write the Solidity verifier to a file
+    let output_path = output_dir.join("vole_verifier.sol");
+    fs::write(&output_path, solidity_verifier)?;
+    println!("Solidity verifier generated at: {}", output_path.display());
 
     Ok(SnarkKeys {
         proving_key,
