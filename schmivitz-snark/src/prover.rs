@@ -1,6 +1,7 @@
 use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
-use ark_std::rand::Rng;
+use ark_snark::SNARK;
+use ark_std::rand::{CryptoRng, Rng};
 use eyre::Result;
 use swanky_field_binary::{F128b, F64b, F8b};
 
@@ -41,14 +42,14 @@ pub struct SnarkKeys {
     pub verification_key: VerifyingKey<Bn254>,
 }
 
-pub fn setup<R: Rng>(rng: &mut R) -> Result<SnarkKeys> {
+pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
     // Create a dummy circuit for setup
     let dummy_circuit = VoleVerificationCircuit {
         // Initialize with dummy values
-        degree_0_commitment: Bn254Fr::zero(),
-        degree_1_commitment: Bn254Fr::one(),
-        verifier_key: Bn254Fr::zero(),
-        validation_aggregate: Bn254Fr::zero(),
+        degree_1_commitment: Bn254Fr::from(0),
+        degree_0_commitment: Bn254Fr::from(0),
+        verifier_key: Bn254Fr::from(0),
+        validation_aggregate: Bn254Fr::from(0),
         witness_commitment: Vec::new(),
         partial_decommitment: Vec::new(),
     };
@@ -62,7 +63,7 @@ pub fn setup<R: Rng>(rng: &mut R) -> Result<SnarkKeys> {
     })
 }
 
-pub fn prove<R: Rng>(
+pub fn prove<R: Rng + CryptoRng>(
     vole_proof: &VoleProof,
     validation_aggregate: &F128b,
     keys: &SnarkKeys,
