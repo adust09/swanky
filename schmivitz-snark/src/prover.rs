@@ -55,6 +55,7 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
         validation_aggregate: Bn254Fr::from(0),
         witness_commitment: Vec::new(),
         partial_decommitment: Vec::new(),
+        witness_challenges: Vec::new(), // Empty vector for setup
     };
 
     let (proving_key, verification_key) =
@@ -103,6 +104,11 @@ pub fn prove<R: Rng + CryptoRng>(
             .witness_voles()
             .iter()
             .flat_map(|arr| arr.iter().map(f8b_to_ark))
+            .collect(),
+        // Generate witness challenges based on the validation aggregate
+        // In a real implementation, these would be derived from a transcript
+        witness_challenges: (0..vole_proof.witness_commitment.len())
+            .map(|_| Bn254Fr::from(1)) // Using 1 as a placeholder, real implementation would use random values
             .collect(),
     };
 

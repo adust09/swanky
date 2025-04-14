@@ -2,7 +2,7 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{ConstraintVerificationGadget, MaskedWitnessGadget};
+use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget};
 
 pub struct VoleVerificationCircuit {
     // Public inputs
@@ -14,6 +14,7 @@ pub struct VoleVerificationCircuit {
     // Private inputs (witness)
     pub witness_commitment: Vec<Bn254Fr>,
     pub partial_decommitment: Vec<Bn254Fr>,
+    pub witness_challenges: Vec<Bn254Fr>,
 }
 
 // Entire the circuit should be implemented in below function
@@ -33,7 +34,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         let verifier_key_var = FpVar::new_input(cs.clone(), || Ok(self.verifier_key))?;
         let validation_aggregate_var =
             FpVar::new_input(cs.clone(), || Ok(self.validation_aggregate))?;
-
         // 2. Allocate private inputs
         let witness_commitment_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_commitment.clone()))?;
@@ -41,6 +41,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         let partial_decommitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || {
             Ok(self.partial_decommitment.clone())
         })?;
+
+        let witness_challenges_var =
+            Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_challenges.clone()))?;
 
         // 3. Compute masked witnesses
         let masked_witnesses_var = MaskedWitnessGadget::compute(
@@ -50,7 +53,18 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             &partial_decommitment_var,
         )?;
 
-        // 4. Verify final constraint
+        // 4. Compute validation aggregate by traversing the circuit
+        let computed_validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
+            cs.clone(),
+            &witness_challenges_var,
+            &verifier_key_var,
+            &masked_witnesses_var,
+        )?;
+
+        // 5. Verify that the computed validation aggregate matches the provided one
+        computed_validation_aggregate.enforce_equal(&validation_aggregate_var)?;
+
+        // 6. Verify final constraint
         let is_valid = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation_aggregate_var,
