@@ -22,7 +22,7 @@ impl ConstraintVerificationGadget {
     /// # Returns
     /// A boolean indicating whether the validation equation is satisfied
     pub fn verify(
-        cs: ConstraintSystemRef<Bn254Fr>,
+        _cs: ConstraintSystemRef<Bn254Fr>,
         validation: &FpVar<Bn254Fr>,
         degree_1_commitment: &FpVar<Bn254Fr>,
         verifier_key: &FpVar<Bn254Fr>,

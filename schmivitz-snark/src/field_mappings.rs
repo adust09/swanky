@@ -3,13 +3,14 @@ use ark_ff::{One, Zero};
 use swanky_field_binary::{F128b, F64b, F8b, F2};
 use swanky_serialization::CanonicalSerialize;
 
-pub fn f2_2_ark(value: &F2) -> Bn254Fr {
-    if *value == F2::one() {
-        Bn254Fr::one()
-    } else {
-        Bn254Fr::zero()
-    }
-}
+// #[warn(dead_code)]
+// pub fn f2_2_ark(value: &F2) -> Bn254Fr {
+//     if *value == F2::one() {
+//         Bn254Fr::one()
+//     } else {
+//         Bn254Fr::zero()
+//     }
+// }
 
 // Convert F8b to arkworks field element
 pub fn f8b_to_ark(value: &F8b) -> Bn254Fr {

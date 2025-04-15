@@ -21,9 +21,9 @@ impl CircuitTraversalGadget {
     ///
     /// * Result containing the validation aggregate or a synthesis error
     pub fn compute_validation_aggregate(
-        cs: ConstraintSystemRef<Bn254Fr>,
+        _cs: ConstraintSystemRef<Bn254Fr>,
         witness_challenge: &[FpVar<Bn254Fr>],
-        verifier_key: &FpVar<Bn254Fr>,
+        _verifier_key: &FpVar<Bn254Fr>,
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
         // Ensure we have the same number of challenges as masked witnesses
