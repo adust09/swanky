@@ -2658,6 +2658,7 @@ dependencies = [
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",
+ "tempfile",
 ]
 
 [[package]]

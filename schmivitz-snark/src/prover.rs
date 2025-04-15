@@ -53,6 +53,7 @@ pub struct SnarkKeys {
     pub verification_key: VerifyingKey<Bn254>,
 }
 
+// todo: implement the conversion from the Schmivitz proof to the VoleProof
 pub fn convert_proof(schmivitz_proof: &Proof<InsecureVole>) -> Result<VoleProof> {
     let vole_proof = VoleProof {
         vole_challenge: convert_challenge(schmivitz_proof.vole_challenge)?,

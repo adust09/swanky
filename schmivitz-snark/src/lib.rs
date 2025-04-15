@@ -3,4 +3,6 @@ mod field_mappings;
 mod gadgets;
 mod prover;
 
-pub use prover::{prove, setup, verify, SnarkKeys, SnarkProof};
+pub use prover::{
+    convert_proof, prove, setup, verify, PartialDecommitment, SnarkKeys, SnarkProof, VoleProof,
+};
