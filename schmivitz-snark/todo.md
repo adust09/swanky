@@ -11,11 +11,11 @@
 
 ### Unit Tests for MaskedWitnessGadget
 
-- [ ] Test basic computation with simple inputs
-- [ ] Test with edge cases (zero values, maximum field values)
-- [ ] Test error handling for invalid inputs
-- [ ] Test constraint satisfaction with various input combinations
-- [ ] Benchmark constraint count for different input sizes
+- [x] Test basic computation with simple inputs
+- [x] Test with edge cases (zero values, maximum field values)
+- [x] Test error handling for invalid inputs
+- [x] Test constraint satisfaction with various input combinations
+- [x] Benchmark constraint count for different input sizes
 
 ## CircuitTraversalGadget Implementation
 
@@ -28,12 +28,12 @@
 
 ### Unit Tests for CircuitTraversalGadget
 
-- [ ] Test validation aggregate computation with simple circuit structures
-- [ ] Test with different witness challenge patterns
-- [ ] Test with edge cases (zero challenges, maximum field values)
-- [ ] Test error handling for invalid inputs
-- [ ] Test constraint satisfaction for different circuit structures
-- [ ] Benchmark constraint count for circuits of varying complexity
+- [x] Test validation aggregate computation with simple circuit structures
+- [x] Test with different witness challenge patterns
+- [x] Test with edge cases (zero challenges, maximum field values)
+- [x] Test error handling for invalid inputs
+- [x] Test constraint satisfaction for different circuit structures
+- [x] Benchmark constraint count for circuits of varying complexity
 
 ## ConstraintVerificationGadget Implementation
 
@@ -47,16 +47,16 @@
 
 - [x] Test verification with valid inputs that should pass
 - [x] Test verification with invalid inputs that should fail
-- [ ] Test with edge cases (zero values, maximum field values)
+- [x] Test with edge cases (zero values, maximum field values)
 - [x] Test constraint generation and satisfaction
-- [ ] Test error handling for invalid inputs
-- [ ] Benchmark constraint count for the verification operation
+- [x] Test error handling for invalid inputs
+- [x] Benchmark constraint count for the verification operation
 
 ## Integration and Testing
 
-- [ ] Create unit tests for MaskedWitnessGadget
-- [ ] Create unit tests for CircuitTraversalGadget
-- [ ] Create unit tests for ConstraintVerificationGadget
+- [x] Create unit tests for MaskedWitnessGadget
+- [x] Create unit tests for CircuitTraversalGadget
+- [x] Create unit tests for ConstraintVerificationGadget
 - [ ] Create integration tests for the complete circuit
 - [x] Test with small example circuits
 - [ ] Test with larger, more complex circuits
