@@ -38,21 +38,21 @@ mod verifier_traverser;
 #[derive(Debug, Clone)]
 pub struct Proof<Vole: RandomVole> {
     /// Challenge generated in VOLE creation.
-    vole_challenge: Vole::VoleChallenge,
+    pub vole_challenge: Vole::VoleChallenge,
     /// Commitment to the extended witness ($`d`$ in the paper).
-    witness_commitment: Vec<F64b>,
+    pub witness_commitment: Vec<F64b>,
     /// Challenges generated after committing to the witness
-    witness_challenges: Vec<F128b>,
+    pub witness_challenges: Vec<F128b>,
     /// Aggregated commitment to the degree-0 term coefficients for each gate in the circuit
     /// ($`\tilde b`$ in the paper).
-    degree_0_commitment: F128b,
+    pub degree_0_commitment: F128b,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
-    degree_1_commitment: F128b,
+    pub degree_1_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
-    decommitment_challenge: Vole::VoleDecommitmentChallenge,
+    pub decommitment_challenge: Vole::VoleDecommitmentChallenge,
     /// Partial decommitment of the VOLEs.
-    partial_decommitment: Vole::Decommitment,
+    pub partial_decommitment: Vole::Decommitment,
 }
 
 impl<Vole: RandomVole> Proof<Vole> {

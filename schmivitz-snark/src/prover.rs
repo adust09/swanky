@@ -3,10 +3,14 @@ use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
 use arkworks_solidity_verifier::SolidityVerifier;
-use eyre::Result;
-use std::fs;
-use std::path::Path;
+use eyre::{Ok, Result};
+use schmivitz::{
+    insecure::InsecureVole,
+    {Proof, RandomVole},
+};
+use std::{fs, path::Path};
 use swanky_field_binary::{F128b, F64b, F8b};
+use swanky_serialization::CanonicalSerialize;
 
 use crate::{
     circuit::VoleVerificationCircuit,
@@ -14,15 +18,19 @@ use crate::{
 };
 
 pub struct VoleProof {
+    pub vole_challenge: F128b,
+    pub witness_commitment: Vec<F64b>,
+    pub witness_challenges: Vec<F128b>,
     pub degree_0_commitment: F128b,
     pub degree_1_commitment: F128b,
-    pub witness_commitment: Vec<F64b>,
+    pub deccomitment_challenge: F128b,
     pub partial_decommitment: PartialDecommitment,
 }
 
 pub struct PartialDecommitment {
     pub verifier_key: F128b,
     pub witness_voles: Vec<Vec<F8b>>,
+    pub mask_voles: [F128b; 128],
 }
 
 impl PartialDecommitment {
@@ -43,6 +51,39 @@ pub struct SnarkProof {
 pub struct SnarkKeys {
     pub proving_key: ProvingKey<Bn254>,
     pub verification_key: VerifyingKey<Bn254>,
+}
+
+pub fn convert_proof(schmivitz_proof: &Proof<InsecureVole>) -> Result<VoleProof> {
+    let vole_proof = VoleProof {
+        vole_challenge: convert_challenge(schmivitz_proof.vole_challenge)?,
+        witness_commitment: schmivitz_proof.witness_commitment.clone(),
+        witness_challenges: schmivitz_proof.witness_challenges.clone(),
+        degree_0_commitment: schmivitz_proof.degree_0_commitment,
+        degree_1_commitment: schmivitz_proof.degree_1_commitment,
+        deccomitment_challenge: convert_challenge(schmivitz_proof.decommitment_challenge)?,
+        partial_decommitment: convert_decommitment(&schmivitz_proof.partial_decommitment)?,
+    };
+    Ok(vole_proof)
+}
+
+fn convert_decommitment(
+    decommitment: &<InsecureVole as RandomVole>::Decommitment,
+) -> Result<PartialDecommitment> {
+    let partial_decommitment = PartialDecommitment {
+        verifier_key: decommitment.verifier_key(),
+        witness_voles: decommitment
+            .witness_voles()
+            .iter()
+            .map(|vole| vole.to_vec())
+            .collect(),
+        mask_voles: decommitment.mask_voles(),
+    };
+    Ok(partial_decommitment)
+}
+
+fn convert_challenge(challenge: [u8; 16]) -> Result<F128b> {
+    let converted_challenge = F128b::from_bytes((&challenge).into());
+    Ok(converted_challenge?)
 }
 
 pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
@@ -69,6 +110,7 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
 
     // Generate the Solidity verifier using the SolidityVerifier trait
     let solidity_verifier = Groth16::<Bn254>::export(&verification_key);
+    // todo: deploy contract
 
     // Write the Solidity verifier to a file
     let output_path = output_dir.join("vole_verifier.sol");

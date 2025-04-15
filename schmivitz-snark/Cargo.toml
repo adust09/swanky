@@ -20,3 +20,4 @@ rand = "0.8.5"
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
+schmivitz = { path = "../schmivitz" }
