@@ -1,6 +1,5 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_ff::{One, Zero};
-use swanky_field_binary::{F128b, F64b, F8b, F2};
+use swanky_field_binary::{F128b, F64b, F8b};
 use swanky_serialization::CanonicalSerialize;
 
 // #[warn(dead_code)]
