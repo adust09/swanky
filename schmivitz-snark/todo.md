@@ -59,33 +59,7 @@
 - [x] Create unit tests for ConstraintVerificationGadget
 - [ ] Create integration tests for the complete circuit
 - [x] Test with small example circuits
-- [ ] Test with larger, more complex circuits
 - [ ] Test edge cases and error handling
-
-## Optimization and Refinement
-
-- [ ] Profile constraint count for each gadget
-- [ ] Identify bottlenecks in constraint generation
-- [ ] Optimize gadget implementations to reduce constraint count
-- [ ] Refactor code for better readability and maintainability
-- [ ] Ensure consistent error handling across all gadgets
-- [ ] Review and improve documentation
-
-## Additional Features
-
-- [x] Implement support for different field types
-- [ ] Add support for custom gates if needed
-- [ ] Implement any additional gadgets identified during development
-- [ ] Create helper functions for common operations
-- [ ] Add debugging utilities for gadget development
-
-## Documentation and Examples
-
-- [ ] Write comprehensive documentation for each gadget
-- [ ] Create example usage patterns for each gadget
-- [ ] Document the mathematical background for the gadgets
-- [ ] Create a guide for extending the gadget system
-- [ ] Document performance characteristics and constraints
 
 ## Implementation Discrepancies with schmivitz
 
@@ -108,7 +82,7 @@
 ### Partial Decommitment Structure
 
 - [ ] Enhance PartialDecommitment structure to match the original implementation
-- [ ] Current implementation is simplified to just contain verifier key and witness voles
+  - [ ] Current implementation is simplified to just contain verifier key and witness voles
 - [ ] Should include all necessary information as in the original implementation
 - [ ] Update related functions to work with the enhanced structure
 - [ ] Ensure compatibility with the verification process

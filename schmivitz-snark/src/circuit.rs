@@ -8,7 +8,7 @@ pub struct VoleVerificationCircuit {
     // Public inputs
     pub degree_0_commitment: Bn254Fr,
     pub degree_1_commitment: Bn254Fr,
-    pub verifier_key: Bn254Fr,
+    pub verifier_key: Bn254Fr, // this variable is should be in the partial decommitment?
     pub validation_aggregate: Bn254Fr,
 
     // Private inputs (witness)

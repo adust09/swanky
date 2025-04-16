@@ -20,6 +20,7 @@ impl CircuitTraversalGadget {
     /// # Returns
     ///
     /// * Result containing the validation aggregate or a synthesis error
+    /// L274-L284
     pub fn compute_validation_aggregate(
         _cs: ConstraintSystemRef<Bn254Fr>,
         witness_challenge: &[FpVar<Bn254Fr>],

@@ -21,6 +21,7 @@ impl ConstraintVerificationGadget {
     ///
     /// # Returns
     /// A boolean indicating whether the validation equation is satisfied
+
     pub fn verify(
         _cs: ConstraintSystemRef<Bn254Fr>,
         validation: &FpVar<Bn254Fr>,
@@ -28,6 +29,8 @@ impl ConstraintVerificationGadget {
         degree_1_commitment: &FpVar<Bn254Fr>,
         verifier_key: &FpVar<Bn254Fr>,
     ) -> Result<Boolean<Bn254Fr>, SynthesisError> {
+        // L287-L292
+        // todo: get validation value from circuit traversal gadget
         // Calculate actual_validation = degree_1_commitment * verifier_key + degree_0_commitment
         let actual_validation = degree_1_commitment.clone() * verifier_key + degree_0_commitment;
 

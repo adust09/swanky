@@ -6,6 +6,7 @@ use std::ops::{Add, Mul};
 pub struct MaskedWitnessGadget;
 
 impl MaskedWitnessGadget {
+    // L236~L271
     pub fn compute(
         _cs: ConstraintSystemRef<Bn254Fr>,
         witness_commitment: &[FpVar<Bn254Fr>],
