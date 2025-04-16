@@ -108,7 +108,7 @@ fn main() -> Result<()> {
     println!("6. Generated SNARK proof");
 
     // Step 8: Verify the SNARK proof
-    let is_valid = verify(&snark_proof, &keys)?;
+    let is_valid = verify(&snark_proof, &keys, &vole_proof)?;
     println!(
         "7. Verified SNARK proof: {}",
         if is_valid { "VALID" } else { "INVALID" }
