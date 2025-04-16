@@ -1,13 +1,13 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::{alloc::AllocVar, R1CSVar};
+use ark_r1cs_std::alloc::AllocVar;
 use ark_relations::r1cs::ConstraintSystem;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, Proof};
 use schmivitz_snark::{
-    convert_proof, prove, setup, verify, CircuitTraversalGadget, Gate, SnarkProof, VoleProof,
-    WireRange,
+    convert_proof, f128b_to_ark, prove, setup, verify, CircuitTraversalGadget, Gate, SnarkProof,
+    VoleProof, WireRange,
 };
 use std::{
     fs::{self, File},
@@ -198,17 +198,13 @@ fn compute_validation_aggregate(vole_proof: &VoleProof) -> F128b {
 
     // Step 3: Run circuit traversal to get validation aggregate
     // Convert the F128b values to Bn254Fr for the circuit computation
-    let verifier_key_ark =
-        field_conversion::f128b_to_ark(&vole_proof.partial_decommitment.verifier_key());
+    let verifier_key_ark = f128b_to_ark(&vole_proof.partial_decommitment.verifier_key());
     let witness_challenges_ark: Vec<Bn254Fr> = vole_proof
         .witness_challenges
         .iter()
-        .map(field_conversion::f128b_to_ark)
+        .map(f128b_to_ark)
         .collect();
-    let masked_witnesses_ark: Vec<Bn254Fr> = masked_witnesses
-        .iter()
-        .map(field_conversion::f128b_to_ark)
-        .collect();
+    let masked_witnesses_ark: Vec<Bn254Fr> = masked_witnesses.iter().map(f128b_to_ark).collect();
 
     // Create FpVar versions of the inputs
     let cs_clone = cs.clone();
@@ -235,8 +231,11 @@ fn compute_validation_aggregate(vole_proof: &VoleProof) -> F128b {
         .unwrap();
 
     // Convert the result back to F128b
-    // Since we can't directly get the value from FpVar in a constraint system,
-    // we'll just use a dummy value for this example
+    // In a real implementation, we would extract the value from validation_aggregate_var
+    // and convert it to F128b. Since we can't directly get the value from FpVar in a
+    // constraint system, we'll use a dummy value for this example.
+    // If we could get the value, we would use:
+    // let validation_aggregate = ark_to_f128b(&validation_aggregate_value);
     let validation_aggregate = F128b::ONE; // Simplified for this example
 
     // Step 4: Compute final validation value (aggregate + mask)
@@ -254,29 +253,6 @@ fn combine_mask_voles(mask_voles: &[F128b; 128]) -> F128b {
         power *= F128b::GENERATOR;
     }
     acc
-}
-
-// Module for field conversion functions
-mod field_conversion {
-    use ark_bn254::Fr as Bn254Fr;
-    use ark_ff::{BigInteger, PrimeField};
-    use swanky_field_binary::F128b;
-    use swanky_serialization::CanonicalSerialize;
-
-    // Convert F128b to Bn254Fr
-    pub fn f128b_to_ark(value: &F128b) -> Bn254Fr {
-        // For simplicity, we'll just convert to a u64 and then to Bn254Fr
-        // In a real implementation, this would need to handle the full 128-bit value
-        let bytes = value.to_bytes();
-        let mut u64_value = 0u64;
-        for i in 0..8 {
-            u64_value |= (bytes[i] as u64) << (i * 8);
-        }
-        Bn254Fr::from(u64_value)
-    }
-
-    // Note: In a real implementation, we would need a proper conversion from Bn254Fr to F128b
-    // For this example, we're simplifying by not implementing this conversion
 }
 
 // Export the proof data in a format suitable for on-chain verification

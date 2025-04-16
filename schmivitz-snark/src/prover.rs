@@ -16,7 +16,7 @@ use swanky_serialization::CanonicalSerialize;
 use crate::{
     circuit::VoleVerificationCircuit,
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
-    transcript::{self, TranscriptWrapper},
+    transcript::TranscriptWrapper,
 };
 
 pub struct VoleProof {

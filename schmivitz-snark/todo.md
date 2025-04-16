@@ -113,11 +113,11 @@
 
 ### Field Conversion Implementation
 
-- [ ] Implement proper field conversion between F128b and Bn254Fr
-  - [ ] Create a robust f128b_to_ark function that handles the full 128-bit value
-  - [ ] Implement ark_to_f128b function using GenericArray for proper type conversion
-  - [ ] Add unit tests for field conversion functions with various input values
-  - [ ] Document the mathematical relationship between the two field types
+- [x] Implement proper field conversion between F128b and Bn254Fr
+  - [x] Create a robust f128b_to_ark function that handles the full 128-bit value
+  - [x] Implement ark_to_f128b function using GenericArray for proper type conversion
+  - [x] Add unit tests for field conversion functions with various input values
+  - [x] Document the mathematical relationship between the two field types
 
 ### Constraint System Value Extraction
 

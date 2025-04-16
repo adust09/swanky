@@ -3,7 +3,7 @@ use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
 use crate::gadgets::{
-    CircuitTraversalGadget, ConstraintVerificationGadget, Gate, MaskedWitnessGadget, WireRange,
+    CircuitTraversalGadget, ConstraintVerificationGadget, Gate, MaskedWitnessGadget,
 };
 
 pub struct VoleVerificationCircuit {
