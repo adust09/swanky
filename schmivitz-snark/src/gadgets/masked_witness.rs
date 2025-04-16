@@ -9,8 +9,8 @@ impl MaskedWitnessGadget {
     pub fn compute(
         _cs: ConstraintSystemRef<Bn254Fr>,
         witness_commitment: &[FpVar<Bn254Fr>],
-        verifier_key: &FpVar<Bn254Fr>,
         partial_decommitment: &[FpVar<Bn254Fr>],
+        verifier_key: &FpVar<Bn254Fr>,
     ) -> Result<Vec<FpVar<Bn254Fr>>, SynthesisError> {
         let mut masked_witnesses = Vec::new();
         for (i, witness) in witness_commitment.iter().enumerate() {
@@ -51,19 +51,19 @@ mod tests {
             create_fp_var(cs.clone(), 2),
             create_fp_var(cs.clone(), 3),
         ];
-        let verifier_key = create_fp_var(cs.clone(), 5);
         let partial_decommitment = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
             create_fp_var(cs.clone(), 30),
         ];
+        let verifier_key = create_fp_var(cs.clone(), 5);
 
         // Compute masked witnesses
         let masked_witnesses = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment,
-            &verifier_key,
             &partial_decommitment,
+            &verifier_key,
         )
         .unwrap();
 
@@ -92,18 +92,18 @@ mod tests {
             create_fp_var(cs.clone(), 0),        // Zero value
             create_fp_var(cs.clone(), u64::MAX), // Maximum u64 value
         ];
-        let verifier_key = create_fp_var(cs.clone(), 1); // Identity for multiplication
         let partial_decommitment = vec![
             create_fp_var(cs.clone(), 0), // Zero value
             create_fp_var(cs.clone(), 1), // Small value
         ];
+        let verifier_key = create_fp_var(cs.clone(), 1); // Identity for multiplication
 
         // Compute masked witnesses
         let masked_witnesses = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment,
-            &verifier_key,
             &partial_decommitment,
+            &verifier_key,
         )
         .unwrap();
 
@@ -125,15 +125,15 @@ mod tests {
 
         // Create empty inputs
         let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
-        let verifier_key = create_fp_var(cs.clone(), 5);
         let partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
+        let verifier_key = create_fp_var(cs.clone(), 5);
 
         // Compute masked witnesses with empty inputs
         let result = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment,
-            &verifier_key,
             &partial_decommitment,
+            &verifier_key,
         );
 
         // This should succeed with an empty result
@@ -157,16 +157,16 @@ mod tests {
 
         // Create test inputs
         let witness_commitment = vec![create_fp_var(cs.clone(), 7), create_fp_var(cs.clone(), 11)];
-        let verifier_key = create_fp_var(cs.clone(), 13);
         let partial_decommitment =
             vec![create_fp_var(cs.clone(), 17), create_fp_var(cs.clone(), 19)];
+        let verifier_key = create_fp_var(cs.clone(), 13);
 
         // Compute masked witnesses
         let masked_witnesses = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment,
-            &verifier_key,
             &partial_decommitment,
+            &verifier_key,
         )
         .unwrap();
 
@@ -207,8 +207,8 @@ mod tests {
             let _ = MaskedWitnessGadget::compute(
                 cs.clone(),
                 &witness_commitment,
-                &verifier_key,
                 &partial_decommitment,
+                &verifier_key,
             )
             .unwrap();
 

@@ -24,13 +24,12 @@ impl ConstraintVerificationGadget {
     pub fn verify(
         _cs: ConstraintSystemRef<Bn254Fr>,
         validation: &FpVar<Bn254Fr>,
+        degree_0_commitment: &FpVar<Bn254Fr>,
         degree_1_commitment: &FpVar<Bn254Fr>,
         verifier_key: &FpVar<Bn254Fr>,
-        degree_0_commitment: &FpVar<Bn254Fr>,
     ) -> Result<Boolean<Bn254Fr>, SynthesisError> {
         // Calculate actual_validation = degree_1_commitment * verifier_key + degree_0_commitment
-        let product = degree_1_commitment.clone() * verifier_key;
-        let actual_validation = product.clone() + degree_0_commitment;
+        let actual_validation = degree_1_commitment.clone() * verifier_key + degree_0_commitment;
 
         // Check if validation == actual_validation
         validation.is_eq(&actual_validation)
@@ -66,9 +65,9 @@ mod tests {
         let result = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation,
+            &degree_0_commitment,
             &degree_1_commitment,
             &verifier_key,
-            &degree_0_commitment,
         )
         .unwrap();
 
@@ -93,20 +92,21 @@ mod tests {
         let validation_val = Fr::from(16u32);
 
         // Create variables
+        let degree_0_commitment =
+            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let degree_1_commitment =
             FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
         let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
-        let degree_0_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
+
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
 
         // Verify
         let result = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation,
+            &degree_0_commitment,
             &degree_1_commitment,
             &verifier_key,
-            &degree_0_commitment,
         )
         .unwrap();
 
@@ -128,19 +128,19 @@ mod tests {
         let verifier_key_val = Fr::from(0u32);
         let validation_val = Fr::from(0u32); // Expected: 0 * 0 + 0 = 0
 
+        let degree_0_commitment =
+            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let degree_1_commitment =
             FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
         let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
-        let degree_0_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
 
         let result = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation,
+            &degree_0_commitment,
             &degree_1_commitment,
             &verifier_key,
-            &degree_0_commitment,
         )
         .unwrap();
 
@@ -159,15 +159,15 @@ mod tests {
         let degree_0_commitment_val = large_value;
         let degree_1_commitment_val = large_value;
         let verifier_key_val = Fr::from(2u32); // Simple multiplier
-
-        // Calculate expected validation: large_value * 2 + large_value
         let validation_val = large_value * Fr::from(2u32) + large_value;
 
+        // Calculate expected validation: large_value * 2 + large_value
+        let degree_0_commitment =
+            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let degree_1_commitment =
             FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
         let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
-        let degree_0_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
+
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
 
         let result = ConstraintVerificationGadget::verify(
@@ -196,12 +196,12 @@ mod tests {
         let validation_val = Fr::from(17u32);
 
         // Create variables
-        let degree_1_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
-        let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
         let degree_0_commitment =
             FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
+        let degree_1_commitment =
+            FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
+        let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
 
         // Test with a constraint system that has been finalized
         // This should not cause an error, as the gadget should be robust
@@ -223,18 +223,18 @@ mod tests {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
         // Create a constant instead of a witness
+        let degree_0_commitment = FpVar::new_constant(cs.clone(), degree_0_commitment_val).unwrap();
         let degree_1_commitment = FpVar::new_constant(cs.clone(), degree_1_commitment_val).unwrap();
         let verifier_key = FpVar::new_constant(cs.clone(), verifier_key_val).unwrap();
-        let degree_0_commitment = FpVar::new_constant(cs.clone(), degree_0_commitment_val).unwrap();
         let validation = FpVar::new_constant(cs.clone(), validation_val).unwrap();
 
         // Verify with constants
         let result = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation,
+            &degree_0_commitment,
             &degree_1_commitment,
             &verifier_key,
-            &degree_0_commitment,
         );
 
         // The operation should succeed with constants as well
@@ -256,12 +256,12 @@ mod tests {
         let validation_val = Fr::from(17u32);
 
         // Create variables
-        let degree_1_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
-        let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
         let degree_0_commitment =
             FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
+        let degree_1_commitment =
+            FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
+        let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
 
         // Record the constraint count before verification
         let constraints_before = cs.num_constraints();
@@ -270,9 +270,9 @@ mod tests {
         let _ = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation,
+            &degree_0_commitment,
             &degree_1_commitment,
             &verifier_key,
-            &degree_0_commitment,
         )
         .unwrap();
 

@@ -23,7 +23,6 @@ impl CircuitTraversalGadget {
     pub fn compute_validation_aggregate(
         _cs: ConstraintSystemRef<Bn254Fr>,
         witness_challenge: &[FpVar<Bn254Fr>],
-        _verifier_key: &FpVar<Bn254Fr>,
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
         // Ensure we have the same number of challenges as masked witnesses
@@ -94,7 +93,6 @@ mod tests {
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -122,8 +120,6 @@ mod tests {
             create_fp_var(cs.clone(), 0),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -134,7 +130,6 @@ mod tests {
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -155,8 +150,6 @@ mod tests {
             create_fp_var(cs.clone(), 4),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 5),
             create_fp_var(cs.clone(), 5),
@@ -167,7 +160,6 @@ mod tests {
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -191,8 +183,6 @@ mod tests {
             create_fp_var(cs.clone(), 0),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -202,7 +192,6 @@ mod tests {
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -232,7 +221,6 @@ mod tests {
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -247,13 +235,11 @@ mod tests {
         let cs = create_cs();
 
         let witness_challenges: Vec<FpVar<Fr>> = vec![];
-        let verifier_key = create_fp_var(cs.clone(), 5);
         let masked_witnesses: Vec<FpVar<Fr>> = vec![];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -273,8 +259,6 @@ mod tests {
         // Test case: Mismatched lengths
         let witness_challenges = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -284,7 +268,6 @@ mod tests {
         let result = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         );
 
@@ -310,8 +293,6 @@ mod tests {
             create_fp_var(cs.clone(), 3),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -321,7 +302,6 @@ mod tests {
         let _ = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -340,8 +320,6 @@ mod tests {
             create_fp_var(cs.clone(), 5),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -353,7 +331,6 @@ mod tests {
         let _ = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges,
-            &verifier_key,
             &masked_witnesses,
         )
         .unwrap();
@@ -380,8 +357,6 @@ mod tests {
                 masked_witnesses.push(create_fp_var(cs.clone(), (i + size) as u64));
             }
 
-            let verifier_key = create_fp_var(cs.clone(), 5);
-
             // Record the constraint count before computation
             let constraints_before = cs.num_constraints();
 
@@ -389,7 +364,6 @@ mod tests {
             let _ = CircuitTraversalGadget::compute_validation_aggregate(
                 cs.clone(),
                 &witness_challenges,
-                &verifier_key,
                 &masked_witnesses,
             )
             .unwrap();

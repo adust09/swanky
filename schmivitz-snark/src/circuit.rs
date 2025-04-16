@@ -49,15 +49,14 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         let masked_witnesses_var = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment_var,
-            &verifier_key_var,
             &partial_decommitment_var,
+            &verifier_key_var,
         )?;
 
         // 4. Compute validation aggregate by traversing the circuit
         let computed_validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
             cs.clone(),
             &witness_challenges_var,
-            &verifier_key_var,
             &masked_witnesses_var,
         )?;
 
@@ -68,9 +67,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         let is_valid = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation_aggregate_var,
+            &degree_0_commitment_var,
             &degree_1_commitment_var,
             &verifier_key_var,
-            &degree_0_commitment_var,
         )?;
 
         // Enforce that the verification passes
