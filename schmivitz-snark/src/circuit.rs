@@ -2,7 +2,9 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget};
+use crate::gadgets::{
+    CircuitTraversalGadget, ConstraintVerificationGadget, Gate, MaskedWitnessGadget, WireRange,
+};
 
 pub struct VoleVerificationCircuit {
     // Public inputs
@@ -15,6 +17,9 @@ pub struct VoleVerificationCircuit {
     pub witness_commitment: Vec<Bn254Fr>,
     pub partial_decommitment: Vec<Bn254Fr>,
     pub witness_challenges: Vec<Bn254Fr>,
+
+    // Circuit description
+    pub circuit_gates: Vec<Gate>,
 }
 
 // Entire the circuit should be implemented in below function
@@ -54,11 +59,23 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         )?;
 
         // 4. Compute validation aggregate by traversing the circuit
-        let computed_validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
-            &witness_challenges_var,
-            &masked_witnesses_var,
-        )?;
+        let computed_validation_aggregate = if self.circuit_gates.is_empty() {
+            // If no circuit gates are provided, use the simplified dot product method
+            CircuitTraversalGadget::compute_validation_aggregate(
+                cs.clone(),
+                &witness_challenges_var,
+                &masked_witnesses_var,
+            )?
+        } else {
+            // If circuit gates are provided, use the full circuit traversal method
+            CircuitTraversalGadget::compute_validation_aggregate_with_circuit(
+                cs.clone(),
+                witness_challenges_var,
+                verifier_key_var.clone(),
+                masked_witnesses_var,
+                &self.circuit_gates,
+            )?
+        };
 
         // 5. Verify that the computed validation aggregate matches the provided one
         computed_validation_aggregate.enforce_equal(&validation_aggregate_var)?;

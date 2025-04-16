@@ -73,11 +73,11 @@
 
 ### Circuit Traversal Logic
 
-- [ ] Enhance CircuitTraversalGadget to properly traverse circuit structure
-- [ ] Current implementation is simplified to a dot product of witness challenges and masked witnesses
-- [ ] Should implement full circuit traversal similar to VerifierTraverser in the original implementation
-- [ ] Add support for processing actual circuit gates and constraints
-- [ ] Ensure the traversal logic matches the original implementation's behavior
+- [x] Enhance CircuitTraversalGadget to properly traverse circuit structure
+- [x] Current implementation is simplified to a dot product of witness challenges and masked witnesses
+- [x] Should implement full circuit traversal similar to VerifierTraverser in the original implementation
+- [x] Add support for processing actual circuit gates and constraints
+- [x] Ensure the traversal logic matches the original implementation's behavior
 
 ### Partial Decommitment Structure
 
@@ -108,3 +108,29 @@
 - [ ] Create unit tests for the conversion function with various Proof inputs
 - [ ] Ensure the enhanced VoleProof structure is compatible with the existing prove function
 - [ ] Update the prove function if necessary to work with the enhanced VoleProof structure
+
+## Field Conversion and Constraint System Handling
+
+### Field Conversion Implementation
+
+- [ ] Implement proper field conversion between F128b and Bn254Fr
+  - [ ] Create a robust f128b_to_ark function that handles the full 128-bit value
+  - [ ] Implement ark_to_f128b function using GenericArray for proper type conversion
+  - [ ] Add unit tests for field conversion functions with various input values
+  - [ ] Document the mathematical relationship between the two field types
+
+### Constraint System Value Extraction
+
+- [ ] Implement proper value extraction from constraint system variables
+  - [ ] Create a mechanism to extract values from FpVar after constraint satisfaction
+  - [ ] Implement a solution for the FpVar::value() issue in circuit traversal
+  - [ ] Add proper error handling for constraint system operations
+  - [ ] Document the constraint system value extraction process
+
+### Example Files Enhancement
+
+- [ ] Update example files to use actual field conversion and constraint system handling
+  - [ ] Replace simplified approaches with proper implementations
+  - [ ] Ensure examples demonstrate best practices for constraint system usage
+  - [ ] Add comments explaining the mathematical operations being performed
+  - [ ] Create additional examples showing different circuit structures

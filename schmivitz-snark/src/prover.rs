@@ -100,6 +100,7 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
         witness_commitment: Vec::new(),
         partial_decommitment: Vec::new(),
         witness_challenges: Vec::new(), // Empty vector for setup
+        circuit_gates: Vec::new(),      // Empty vector for setup
     };
 
     let (proving_key, verification_key) =
@@ -174,6 +175,8 @@ pub fn prove<R: Rng + CryptoRng>(
         // Generate witness challenges based on the validation aggregate
         // In a real implementation, these would be derived from a transcript
         witness_challenges: witness_challenge,
+        // Circuit gates - currently empty, but could be populated with actual circuit gates
+        circuit_gates: Vec::new(),
     };
 
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
