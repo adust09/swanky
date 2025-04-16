@@ -4,6 +4,7 @@ use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
 use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::{Ok, Result};
+use merlin::Transcript;
 use schmivitz::{
     insecure::InsecureVole,
     {Proof, RandomVole},
@@ -15,6 +16,7 @@ use swanky_serialization::CanonicalSerialize;
 use crate::{
     circuit::VoleVerificationCircuit,
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
+    transcript::{self, TranscriptWrapper},
 };
 
 pub struct VoleProof {
@@ -130,8 +132,29 @@ pub fn prove<R: Rng + CryptoRng>(
     keys: &SnarkKeys,
     rng: &mut R,
 ) -> Result<SnarkProof> {
+    let mut transcript = Transcript::new(b"schmivitz-snark");
+    let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
+
+    transcript_wrapper.append_public_values();
+
+    let witness_commitment_ark: Vec<Bn254Fr> = vole_proof
+        .witness_commitment
+        .iter()
+        .map(f64b_to_ark)
+        .collect();
+    transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
+
+    let witness_challenge =
+        transcript_wrapper.extract_witness_challenges(vole_proof.witness_commitment.len());
+
+    transcript_wrapper.append_polynomial_commitments(
+        f128b_to_ark(&vole_proof.degree_0_commitment),
+        f128b_to_ark(&vole_proof.degree_1_commitment),
+    );
+
     // Convert VOLE proof to circuit inputs
     let circuit = VoleVerificationCircuit {
+        // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
         degree_1_commitment: f128b_to_ark(&vole_proof.degree_1_commitment),
         verifier_key: f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
@@ -150,9 +173,7 @@ pub fn prove<R: Rng + CryptoRng>(
             .collect(),
         // Generate witness challenges based on the validation aggregate
         // In a real implementation, these would be derived from a transcript
-        witness_challenges: (0..vole_proof.witness_commitment.len())
-            .map(|_| Bn254Fr::from(1)) // Using 1 as a placeholder, real implementation would use random values
-            .collect(),
+        witness_challenges: witness_challenge,
     };
 
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
@@ -168,7 +189,31 @@ pub fn prove<R: Rng + CryptoRng>(
     Ok(SnarkProof { proof, inputs })
 }
 
-pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys) -> Result<bool> {
+pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof) -> Result<bool> {
+    let mut transcript = Transcript::new(b"schmivitz-snark");
+    let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
+
+    transcript_wrapper.append_public_values();
+
+    let witness_commitment_ark: Vec<Bn254Fr> = vole_proof
+        .witness_commitment
+        .iter()
+        .map(f64b_to_ark)
+        .collect();
+    transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
+
+    let expected_witness_challenges =
+        transcript_wrapper.extract_witness_challenges(vole_proof.witness_commitment.len());
+    if expected_witness_challenges
+        != vole_proof
+            .witness_challenges
+            .iter()
+            .map(f128b_to_ark)
+            .collect::<Vec<_>>()
+    {
+        return Ok(false);
+    }
+
     Ok(Groth16::<Bn254>::verify(
         &keys.verification_key,
         &snark_proof.inputs,

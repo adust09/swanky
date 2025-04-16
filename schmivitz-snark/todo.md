@@ -65,10 +65,10 @@
 
 ### Witness Challenges Handling
 
-- [ ] Fix witness challenges implementation in prover.rs
-- [ ] Currently, witness challenges are hardcoded as constant values (all set to 1)
-- [ ] Should be derived from the transcript as in the original schmivitz implementation
-- [ ] Update the prove function to properly derive witness challenges from transcript
+- [x] Fix witness challenges implementation in prover.rs
+- [x] Currently, witness challenges are hardcoded as constant values (all set to 1)
+- [x] Should be derived from the transcript as in the original schmivitz implementation
+- [x] Update the prove function to properly derive witness challenges from transcript
 - [ ] Ensure challenges are verified against expected values as in the original implementation
 
 ### Circuit Traversal Logic
