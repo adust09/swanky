@@ -92,31 +92,26 @@ fn convert_challenge(challenge: [u8; 16]) -> Result<F128b> {
 pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
     // Create a dummy circuit for setup
     let dummy_circuit = VoleVerificationCircuit {
-        // Initialize with dummy values
         degree_1_commitment: Bn254Fr::from(0),
         degree_0_commitment: Bn254Fr::from(0),
         verifier_key: Bn254Fr::from(0),
-        validation_aggregate: Bn254Fr::from(0),
         witness_commitment: Vec::new(),
         partial_decommitment: Vec::new(),
-        witness_challenges: Vec::new(), // Empty vector for setup
-        circuit_gates: Vec::new(),      // Empty vector for setup
+        witness_challenges: Vec::new(),
+        circuit_gates: Vec::new(),
     };
 
     let (proving_key, verification_key) =
         Groth16::<Bn254>::circuit_specific_setup(dummy_circuit, rng)?;
 
-    // Generate and output Solidity verifier at setup time
     let output_dir = Path::new("solidity_output");
     if !output_dir.exists() {
         fs::create_dir_all(output_dir)?;
     }
 
-    // Generate the Solidity verifier using the SolidityVerifier trait
     let solidity_verifier = Groth16::<Bn254>::export(&verification_key);
     // todo: deploy contract
 
-    // Write the Solidity verifier to a file
     let output_path = output_dir.join("vole_verifier.sol");
     fs::write(&output_path, solidity_verifier)?;
     println!("Solidity verifier generated at: {}", output_path.display());
@@ -129,7 +124,6 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
 
 pub fn prove<R: Rng + CryptoRng>(
     vole_proof: &VoleProof,
-    validation_aggregate: &F128b,
     keys: &SnarkKeys,
     rng: &mut R,
 ) -> Result<SnarkProof> {
@@ -153,13 +147,11 @@ pub fn prove<R: Rng + CryptoRng>(
         f128b_to_ark(&vole_proof.degree_1_commitment),
     );
 
-    // Convert VOLE proof to circuit inputs
     let circuit = VoleVerificationCircuit {
         // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
         degree_1_commitment: f128b_to_ark(&vole_proof.degree_1_commitment),
         verifier_key: f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
-        validation_aggregate: f128b_to_ark(validation_aggregate),
         // Private Inputs
         witness_commitment: vole_proof
             .witness_commitment
@@ -186,7 +178,6 @@ pub fn prove<R: Rng + CryptoRng>(
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
         f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
-        f128b_to_ark(validation_aggregate),
     ];
 
     Ok(SnarkProof { proof, inputs })

@@ -11,7 +11,6 @@ pub struct VoleVerificationCircuit {
     pub degree_0_commitment: Bn254Fr,
     pub degree_1_commitment: Bn254Fr,
     pub verifier_key: Bn254Fr, // this variable is should be in the partial decommitment?
-    pub validation_aggregate: Bn254Fr,
 
     // Private inputs (witness)
     pub witness_commitment: Vec<Bn254Fr>,
@@ -22,24 +21,14 @@ pub struct VoleVerificationCircuit {
     pub circuit_gates: Vec<Gate>,
 }
 
-// Entire the circuit should be implemented in below function
-// Validating the proof structure
-// Checking transcript challenges
-// Computing masked witnesses
-// Traversing the circuit to compute validation aggregates
-// Verifying the final constraint equation
-
 impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
     fn generate_constraints(self, cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError> {
-        // 1. Allocate public inputs
         let degree_0_commitment_var =
             FpVar::new_input(cs.clone(), || Ok(self.degree_0_commitment))?;
         let degree_1_commitment_var =
             FpVar::new_input(cs.clone(), || Ok(self.degree_1_commitment))?;
         let verifier_key_var = FpVar::new_input(cs.clone(), || Ok(self.verifier_key))?;
-        let validation_aggregate_var =
-            FpVar::new_input(cs.clone(), || Ok(self.validation_aggregate))?;
-        // 2. Allocate private inputs
+
         let witness_commitment_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_commitment.clone()))?;
 
@@ -50,7 +39,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
         let witness_challenges_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_challenges.clone()))?;
 
-        // 3. Compute masked witnesses
         let masked_witnesses_var = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment_var,
@@ -58,8 +46,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             &verifier_key_var,
         )?;
 
-        // 4. Compute validation aggregate by traversing the circuit
-        let computed_validation_aggregate = if self.circuit_gates.is_empty() {
+        let validation_aggregate_var = if self.circuit_gates.is_empty() {
             // If no circuit gates are provided, use the simplified dot product method
             CircuitTraversalGadget::compute_validation_aggregate(
                 cs.clone(),
@@ -77,10 +64,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             )?
         };
 
-        // 5. Verify that the computed validation aggregate matches the provided one
-        computed_validation_aggregate.enforce_equal(&validation_aggregate_var)?;
-
-        // 6. Verify final constraint
         let is_valid = ConstraintVerificationGadget::verify(
             cs.clone(),
             &validation_aggregate_var,
