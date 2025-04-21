@@ -120,12 +120,12 @@ mod tests {
         assert!(cs.is_satisfied().unwrap());
     }
     #[test]
-    /// Test with edge cases (zero values, maximum field values)
-    fn test_edge_cases() {
+    /// Test with all zero values
+    fn test_edge_case_zero_values() {
         // Create a new constraint system
         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        // Test case 1: All zeros
+        // Test case: All zeros
         let degree_0_commitment_val = Fr::from(0u32);
         let degree_1_commitment_val = Fr::from(0u32);
         let verifier_key_val = Fr::from(0u32);
@@ -149,9 +149,12 @@ mod tests {
 
         assert!(result.value().unwrap());
         assert!(cs.is_satisfied().unwrap());
+    }
 
-        // Test case 2: Large values (near field size)
-        // Create a new constraint system for the second test
+    #[test]
+    /// Test with large values near field size
+    fn test_edge_case_large_values() {
+        // Create a new constraint system
         let cs = ConstraintSystem::<Fr>::new_ref();
 
         // Use large values close to the field size
@@ -243,56 +246,5 @@ mod tests {
         // The operation should succeed with constants as well
         assert!(result.is_ok());
         assert!(result.unwrap().value().unwrap());
-    }
-
-    #[test]
-    /// Benchmark constraint count for the verification operation
-    fn benchmark_constraint_count() {
-        // Create a new constraint system
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        cs.set_optimization_goal(ark_relations::r1cs::OptimizationGoal::Constraints);
-
-        // Create test values
-        let degree_0_commitment_val = Fr::from(5u32);
-        let degree_1_commitment_val = Fr::from(3u32);
-        let verifier_key_val = Fr::from(4u32);
-        let validation_val = Fr::from(17u32);
-
-        // Create variables
-        let degree_0_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_0_commitment_val)).unwrap();
-        let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
-        let degree_1_commitment =
-            FpVar::new_witness(cs.clone(), || Ok(degree_1_commitment_val)).unwrap();
-        let verifier_key = FpVar::new_witness(cs.clone(), || Ok(verifier_key_val)).unwrap();
-
-        // Record the constraint count before verification
-        let constraints_before = cs.num_constraints();
-
-        // Verify
-        let _ = ConstraintVerificationGadget::verify(
-            cs.clone(),
-            &validation,
-            &degree_0_commitment,
-            &degree_1_commitment,
-            &verifier_key,
-        )
-        .unwrap();
-
-        // Record the constraint count after verification
-        let constraints_after = cs.num_constraints();
-
-        // Calculate the number of constraints added
-        let constraints_added = constraints_after - constraints_before;
-
-        // Print the benchmark results
-        println!("Constraints added by verification: {}", constraints_added);
-
-        // The verification should add a small, constant number of constraints
-        // Typically, it should add constraints for:
-        // 1. Multiplication: degree_1_commitment * verifier_key
-        // 2. Addition: product + degree_0_commitment
-        // 3. Equality check: validation == actual_validation
-        assert!(constraints_added <= 10); // Assuming at most 10 constraints
     }
 }

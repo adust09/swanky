@@ -133,3 +133,48 @@
   - [x] Replace simplified approaches with proper implementations
   - [x] Ensure examples demonstrate best practices for constraint system usage
   - [x] Add comments explaining the mathematical operations being performed
+
+### Constraint System Satisfaction Issue
+
+- [ ] Fix constraint system satisfaction error in advanced_usage example
+ - [ ] Current error: `assertion failed: cs.is_satisfied().unwrap()` in Groth16 prover
+ - [ ] Error occurs after fixing the transcript challenge deserialization issue
+ - [ ] Investigate why the circuit constraints are not being satisfied
+ - [ ] Possible causes:
+   - [ ] Mismatch between witness challenges and masked witnesses
+   - [ ] Incorrect computation of validation aggregate
+   - [ ] Issues with field element conversions affecting constraint satisfaction
+   - [ ] Incompatibility between the circuit structure and the proof values
+ - [ ] Implement a solution that ensures constraint satisfaction
+ - [ ] Add tests to verify constraint satisfaction with various inputs
+ - [ ] Document the solution and the underlying mathematical relationships
+
+### Missing Tests for Constraint System Analysis
+
+#### Unit Tests
+- [ ] Circuit Constraint Tests
+  - [ ] Test constraint generation for each gate type individually
+  - [ ] Test constraint violation detection with invalid inputs
+  - [ ] Test edge cases in constraint generation (empty circuits, single gate circuits)
+
+- [ ] Witness Validation Tests
+  - [ ] Test witness validation with boundary values
+  - [ ] Test witness validation with invalid field elements
+  - [ ] Test witness validation with missing or extra values
+
+- [ ] Field Mapping Tests
+  - [ ] Test field element conversions with edge cases
+  - [ ] Test field mapping error handling
+
+#### Integration Tests
+- [ ] End-to-End Circuit Tests
+  - [ ] Test complete circuit setup and verification
+  - [ ] Test circuit with different gate combinations
+  - [ ] Test circuit with varying witness sizes
+  - [ ] Test circuit with different field configurations
+
+- [ ] Prover-Verifier Interaction Tests
+  - [ ] Test proof generation with valid circuits
+  - [ ] Test proof verification with valid proofs
+  - [ ] Test proof verification with invalid proofs
+  - [ ] Test proof verification with modified proofs
