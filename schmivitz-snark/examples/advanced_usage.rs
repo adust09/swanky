@@ -1,13 +1,13 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::alloc::AllocVar;
+use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::r1cs::ConstraintSystem;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, Proof};
 use schmivitz_snark::{
-    convert_proof, f128b_to_ark, prove, setup, verify, CircuitTraversalGadget, Gate, SnarkProof,
-    VoleProof, WireRange,
+    convert_proof, f128b_to_ark, f64b_to_ark, f8b_to_ark, prove, setup, verify,
+    CircuitTraversalGadget, Gate, MaskedWitnessGadget, SnarkProof, VoleProof, WireRange,
 };
 use std::{
     fs::{self, File},
@@ -106,11 +106,11 @@ fn main() -> Result<()> {
     );
 
     // Step 6: Compute validation aggregate
-    let validation_aggregate = compute_validation_aggregate(&vole_proof);
+    let validation_result = validation(&vole_proof);
     println!("5. Computed validation aggregate");
 
     // Step 7: Generate a SNARK proof
-    let snark_proof = prove(&vole_proof, &validation_aggregate, &keys, rng)?;
+    let snark_proof = prove(&vole_proof, &validation_result, &keys, rng)?;
     println!("6. Generated SNARK proof");
 
     // Step 8: Verify the SNARK proof
@@ -129,9 +129,10 @@ fn main() -> Result<()> {
 }
 
 // Compute the validation aggregate using the new CircuitTraversalGadget implementation
-fn compute_validation_aggregate(vole_proof: &VoleProof) -> F128b {
+fn validation(vole_proof: &VoleProof) -> F128b {
     // Create a constraint system for the computation
-    let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+    let cs: ark_relations::r1cs::ConstraintSystemRef<ark_ff::Fp256<ark_bn254::FrParameters>> =
+        ConstraintSystem::<Bn254Fr>::new_ref();
 
     // Create a circuit representation for the complex circuit in the example:
     // $0 ... $3 <- @private(0);
@@ -183,42 +184,61 @@ fn compute_validation_aggregate(vole_proof: &VoleProof) -> F128b {
         },
     ];
 
-    // Step 1: Compute masked witnesses
-    // In a real implementation, this would be computed from the witness commitment
-    // and the verifier key. For simplicity, we'll use the witness_voles directly.
-    let masked_witnesses: Vec<F128b> = vole_proof
-        .partial_decommitment
-        .witness_voles()
+    let verifier_key_ark: ark_ff::Fp256<ark_bn254::FrParameters> =
+        f128b_to_ark(&vole_proof.partial_decommitment.verifier_key());
+    let witness_challenges_ark: Vec<Bn254Fr> = vole_proof
+        .witness_challenges
         .iter()
-        .map(|_| F128b::ONE) // Simplified for this example
+        .map(f128b_to_ark)
         .collect();
+    let witness_commitment_ark: Vec<Bn254Fr> = vole_proof
+        .witness_commitment
+        .iter()
+        .map(f64b_to_ark)
+        .collect();
+    let partial_decommitment_ark = vole_proof
+        .partial_decommitment
+        .witness_voles
+        .iter()
+        .map(|v| v.iter().map(|&x| f8b_to_ark(&x)).collect::<Vec<Bn254Fr>>())
+        .collect::<Vec<_>>();
+
+    let witness_challenges_var = witness_challenges_ark
+        .iter()
+        .map(|c| ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(*c)).unwrap())
+        .collect::<Vec<_>>();
+    let witness_commitment_var = witness_commitment_ark
+        .iter()
+        .map(|w| ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(*w)).unwrap())
+        .collect::<Vec<_>>();
+    let partial_deccomitment_var: Vec<FpVar<Bn254Fr>> = partial_decommitment_ark
+        .iter()
+        .flat_map(|p| {
+            p.iter()
+                .map(|&x| ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(x)).unwrap())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let verifier_key_var =
+        ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(verifier_key_ark)).unwrap();
+
+    // Step 1: Compute masked witnesses
+    let masked_witnesses_var = MaskedWitnessGadget::compute(
+        cs.clone(),
+        &witness_commitment_var,
+        &partial_deccomitment_var,
+        &verifier_key_var,
+    )
+    .unwrap();
 
     // Step 2: Combine mask VOLEs to get validation mask
     let validation_mask = combine_mask_voles(&vole_proof.partial_decommitment.mask_voles);
 
     // Step 3: Run circuit traversal to get validation aggregate
     // Convert the F128b values to Bn254Fr for the circuit computation
-    let verifier_key_ark = f128b_to_ark(&vole_proof.partial_decommitment.verifier_key());
-    let witness_challenges_ark: Vec<Bn254Fr> = vole_proof
-        .witness_challenges
-        .iter()
-        .map(f128b_to_ark)
-        .collect();
-    let masked_witnesses_ark: Vec<Bn254Fr> = masked_witnesses.iter().map(f128b_to_ark).collect();
 
-    // Create FpVar versions of the inputs
-    let cs_clone = cs.clone();
-    let verifier_key_var =
-        ark_r1cs_std::fields::fp::FpVar::new_input(cs_clone, || Ok(verifier_key_ark)).unwrap();
-    let witness_challenges_var = witness_challenges_ark
-        .iter()
-        .map(|c| ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(*c)).unwrap())
-        .collect::<Vec<_>>();
-    let masked_witnesses_var = masked_witnesses_ark
-        .iter()
-        .map(|w| ark_r1cs_std::fields::fp::FpVar::new_input(cs.clone(), || Ok(*w)).unwrap())
-        .collect::<Vec<_>>();
-
+    // Use the masked_witnesses returned from MaskedWitnessGadget::compute
+    // No need to convert them to FpVar as they are already FpVar values
     // Compute the validation aggregate using the circuit traversal
     let _validation_aggregate_var =
         CircuitTraversalGadget::compute_validation_aggregate_with_circuit(
@@ -256,7 +276,8 @@ fn combine_mask_voles(mask_voles: &[F128b; 128]) -> F128b {
 }
 
 // Export the proof data in a format suitable for on-chain verification
-fn export_proof_for_onchain(snark_proof: &SnarkProof) -> Result<()> {
+// todo: deploy contract
+fn export_proof_for_onchain(_snark_proof: &SnarkProof) -> Result<()> {
     // In a real implementation, this would serialize the proof in a format
     // suitable for on-chain verification, such as a JSON file with the proof
     // parameters in the format expected by the Solidity verifier.

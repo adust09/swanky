@@ -142,8 +142,8 @@ mod tests {
         assert_eq!(result.unwrap().len(), 0);
 
         // Test with non-empty witness but empty decommitment
-        let witness_commitment = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
-        let partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
+        let _witness_commitment = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
+        let _partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
 
         // In a real implementation, we would add explicit length checks
         // and return an error if the lengths don't match.

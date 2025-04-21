@@ -263,7 +263,7 @@ impl CircuitTraversalGadget {
     ///
     /// * Result containing the validation aggregate or a synthesis error
     pub fn compute_validation_aggregate(
-        cs: ConstraintSystemRef<Bn254Fr>,
+        _cs: ConstraintSystemRef<Bn254Fr>,
         witness_challenge: &[FpVar<Bn254Fr>],
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
@@ -390,7 +390,7 @@ mod tests {
         ];
 
         // Verifier key
-        let verifier_key = create_fp_var(cs.clone(), 5);
+        let _verifier_key = create_fp_var(cs.clone(), 5);
 
         // Masked witnesses
         let masked_witnesses = vec![
@@ -589,7 +589,7 @@ mod tests {
 
         let witness_challenges = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 1)];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
+        let _verifier_key = create_fp_var(cs.clone(), 5);
 
         // Create masked witnesses with large values
         let masked_witness1 = FpVar::new_witness(cs.clone(), || Ok(large_value)).unwrap();

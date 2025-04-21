@@ -129,8 +129,7 @@
 
 ### Example Files Enhancement
 
-- [ ] Update example files to use actual field conversion and constraint system handling
-  - [ ] Replace simplified approaches with proper implementations
-  - [ ] Ensure examples demonstrate best practices for constraint system usage
-  - [ ] Add comments explaining the mathematical operations being performed
-  - [ ] Create additional examples showing different circuit structures
+- [x] Update example files to use actual field conversion and constraint system handling
+  - [x] Replace simplified approaches with proper implementations
+  - [x] Ensure examples demonstrate best practices for constraint system usage
+  - [x] Add comments explaining the mathematical operations being performed
