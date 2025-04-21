@@ -45,15 +45,25 @@ impl<'a> TranscriptWrapper<'a> {
     }
 
     pub fn extract_witness_challenges(&mut self, polynomial_count: usize) -> Vec<Bn254Fr> {
-        use ark_ff::FromBytes;
+        use ark_ff::UniformRand;
+        use rand::{rngs::StdRng, SeedableRng};
         use std::iter::repeat_with;
 
         repeat_with(|| {
-            let mut bytes = [0u8; 32];
+            let mut seed_bytes = [0u8; 32];
             self.0
-                .challenge_bytes(b"chi_i: witness challenge", &mut bytes);
+                .challenge_bytes(b"chi_i: witness challenge", &mut seed_bytes);
 
-            Bn254Fr::read(&bytes[..]).unwrap_or_else(|_| Bn254Fr::read(&bytes[..]).unwrap())
+            // Use the challenge bytes as a seed for a deterministic RNG
+            let mut seed = [0u8; 32];
+            seed.copy_from_slice(&seed_bytes[0..32]);
+
+            // Create a deterministic RNG from the seed
+            let mut rng = StdRng::from_seed(seed);
+
+            // Generate a random field element using the seeded RNG
+            // This ensures we get a valid field element within the correct range
+            Bn254Fr::rand(&mut rng)
         })
         .take(polynomial_count)
         .collect()

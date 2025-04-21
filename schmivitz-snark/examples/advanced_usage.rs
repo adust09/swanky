@@ -71,32 +71,5 @@ fn main() -> Result<()> {
         "Verified SNARK proof: {}",
         if is_valid { "VALID" } else { "INVALID" }
     );
-
-    export_proof_for_onchain(&snark_proof)?;
-    println!("   Proof data saved to: solidity_output/proof_data.json");
-
-    Ok(())
-}
-
-// Export the proof data in a format suitable for on-chain verification
-// todo: deploy contract
-fn export_proof_for_onchain(_snark_proof: &SnarkProof) -> Result<()> {
-    // In a real implementation, this would serialize the proof in a format
-    // suitable for on-chain verification, such as a JSON file with the proof
-    // parameters in the format expected by the Solidity verifier.
-
-    // For this example, we'll just create a dummy JSON file
-    let proof_data = r#"{
-        "proof": {
-            "a": ["0x1234...", "0x5678..."],
-            "b": [["0xabcd...", "0xef01..."], ["0x2345...", "0x6789..."]],
-            "c": ["0x9abc...", "0xdef0..."]
-        },
-        "inputs": ["0x1111...", "0x2222...", "0x3333...", "0x4444..."]
-    }"#;
-
-    let output_path = Path::new("solidity_output").join("proof_data.json");
-    fs::write(output_path, proof_data)?;
-
     Ok(())
 }
