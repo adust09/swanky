@@ -12,22 +12,18 @@ use std::{
 fn main() -> Result<()> {
     let circuit_bytes = "version 2.0.0;
         circuit;
-        @type field 18446744073709551616;
+        @type field 2;
         @begin
-          // Private inputs (message to hash)
           $0 ... $3 <- @private(0);
           
-          // First round
           $4 <- @add(0: $0, $1);
           $5 <- @mul(0: $0, $1);
           $6 <- @add(0: $2, $3);
           $7 <- @mul(0: $2, $3);
           
-          // Second round
           $8 <- @add(0: $4, $7);
           $9 <- @mul(0: $5, $6);
           
-          // Output (hash result)
           $10 <- @add(0: $8, $9);
         @end ";
     let circuit = Cursor::new(circuit_bytes.as_bytes());
@@ -43,13 +39,13 @@ fn main() -> Result<()> {
         @end";
 
     // Create a temporary file for private input
-    let temp_dir = tempfile::tempdir()?;
+    let temp_dir: tempfile::TempDir = tempfile::tempdir()?;
     let private_input_path = temp_dir.path().join("private_input.txt");
     let mut private_input_file = File::create(&private_input_path)?;
     writeln!(private_input_file, "{}", private_input_bytes)?;
     private_input_file.flush()?;
 
-    let mut transcript = Transcript::new(b"schmivitz-snark advanced example");
+    let mut transcript = Transcript::new(b"schmivitz-snark example");
     let rng = &mut thread_rng();
 
     let schmivitz_proof = Proof::<InsecureVole>::prove(
