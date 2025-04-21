@@ -215,3 +215,53 @@ pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof
     )
     .is_ok())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use swanky_field::FiniteRing;
+
+    #[test]
+    fn test_partial_decommitment_accessors() {
+        // Test the accessor methods of PartialDecommitment
+        let verifier_key = F128b::ONE;
+        let witness_voles = vec![vec![F8b::ZERO, F8b::ONE]];
+        let mask_voles = [F128b::ZERO; 128];
+
+        let decommitment = PartialDecommitment {
+            verifier_key,
+            witness_voles: witness_voles.clone(),
+            mask_voles,
+        };
+
+        // Test verifier_key accessor
+        assert_eq!(decommitment.verifier_key(), verifier_key);
+
+        // Test witness_voles accessor
+        let returned_voles = decommitment.witness_voles();
+        assert_eq!(returned_voles.len(), witness_voles.len());
+        assert_eq!(returned_voles[0].len(), witness_voles[0].len());
+        assert_eq!(returned_voles[0][0], witness_voles[0][0]);
+        assert_eq!(returned_voles[0][1], witness_voles[0][1]);
+    }
+
+    #[test]
+    fn test_convert_challenge() {
+        // Test converting a challenge to F128b
+        let challenge = [1u8; 16];
+        let result = convert_challenge(challenge);
+
+        // Check that the conversion succeeds
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_setup_and_prove() {
+        // This test would create a dummy circuit and set up the keys
+        // For now, we'll just check that the functions exist
+        let _setup_fn = setup::<rand::rngs::StdRng>;
+        let _prove_fn = prove::<rand::rngs::StdRng>;
+        let _verify_fn = verify;
+    }
+}
