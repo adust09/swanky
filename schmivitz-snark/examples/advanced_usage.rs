@@ -60,8 +60,8 @@ fn main() -> Result<()> {
     }
     println!("   Solidity verifier generated at: solidity_output/vole_verifier.sol");
 
-    let vole_proof = convert_proof(&schmivitz_proof)?;
-    let snark_proof = prove(&vole_proof, &keys, rng)?;
+    let mut vole_proof = convert_proof(&schmivitz_proof)?;
+    let snark_proof = prove(&mut vole_proof, &keys, rng)?;
 
     let is_valid = verify(&snark_proof, &keys, &vole_proof)?;
     println!(

@@ -1,5 +1,6 @@
 use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
+use ark_serialize::CanonicalSerialize;
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
 use arkworks_solidity_verifier::SolidityVerifier;
@@ -11,14 +12,14 @@ use schmivitz::{
 };
 use std::{fs, path::Path};
 use swanky_field_binary::{F128b, F64b, F8b};
-use swanky_serialization::CanonicalSerialize;
+use swanky_serialization::CanonicalSerialize as _;
 
 use crate::{
     circuit::VoleVerificationCircuit,
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
     transcript::TranscriptWrapper,
 };
-
+#[derive(Debug, Clone)]
 pub struct VoleProof {
     pub vole_challenge: F128b,
     pub witness_commitment: Vec<F64b>,
@@ -28,7 +29,7 @@ pub struct VoleProof {
     pub deccomitment_challenge: F128b,
     pub partial_decommitment: PartialDecommitment,
 }
-
+#[derive(Debug, Clone)]
 pub struct PartialDecommitment {
     pub verifier_key: F128b,
     pub witness_voles: Vec<Vec<F8b>>,
@@ -123,7 +124,7 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
 }
 
 pub fn prove<R: Rng + CryptoRng>(
-    vole_proof: &VoleProof,
+    vole_proof: &mut VoleProof,
     keys: &SnarkKeys,
     rng: &mut R,
 ) -> Result<SnarkProof> {
@@ -139,9 +140,12 @@ pub fn prove<R: Rng + CryptoRng>(
         .collect();
     transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
 
-    let witness_challenge =
+    // Extract witness challenges from the transcript
+    // This ensures challenges are derived deterministically from the transcript
+    let witness_challenges =
         transcript_wrapper.extract_witness_challenges(vole_proof.witness_challenges.len());
 
+    // Append polynomial commitments to continue the transcript
     transcript_wrapper.append_polynomial_commitments(
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
@@ -164,16 +168,14 @@ pub fn prove<R: Rng + CryptoRng>(
             .iter()
             .flat_map(|arr| arr.iter().map(f8b_to_ark))
             .collect(),
-        // Generate witness challenges based on the validation aggregate
-        // In a real implementation, these would be derived from a transcript
-        witness_challenges: witness_challenge,
+        witness_challenges,
         // Circuit gates - currently empty, but could be populated with actual circuit gates
         circuit_gates: Vec::new(),
     };
 
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
 
-    // todo: convert from proof.json?
+    // Prepare the public inputs for verification
     let inputs = vec![
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
@@ -198,27 +200,44 @@ pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof
 
     let expected_witness_challenges =
         transcript_wrapper.extract_witness_challenges(vole_proof.witness_challenges.len());
-    if expected_witness_challenges
-        != vole_proof
-            .witness_challenges
-            .iter()
-            .map(f128b_to_ark)
-            .collect::<Vec<_>>()
-    {
+    let proof_witness_challenges: Vec<Bn254Fr> = vole_proof
+        .witness_challenges
+        .iter()
+        .map(f128b_to_ark)
+        .collect();
+
+    // Verify that the challenges in the proof match the expected challenges
+    // This ensures the prover didn't manipulate the challenges
+    if expected_witness_challenges != proof_witness_challenges {
+        println!("Challenge verification failed: challenges in proof don't match expected values");
         return Ok(false);
     }
 
-    Ok(Groth16::<Bn254>::verify(
+    // Append polynomial commitments to continue the transcript
+    transcript_wrapper.append_polynomial_commitments(
+        f128b_to_ark(&vole_proof.degree_0_commitment),
+        f128b_to_ark(&vole_proof.degree_1_commitment),
+    );
+
+    let snark_verification = Groth16::<Bn254>::verify(
         &keys.verification_key,
         &snark_proof.inputs,
         &snark_proof.proof,
-    )
-    .is_ok())
+    );
+
+    if snark_verification.is_err() {
+        println!("SNARK verification failed");
+        return Ok(false);
+    }
+
+    Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ark_std::rand::rngs::StdRng;
+    use ark_std::rand::SeedableRng;
     use swanky_field::FiniteRing;
 
     #[test]
@@ -256,12 +275,47 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    fn test_setup_and_prove() {
-        // This test would create a dummy circuit and set up the keys
-        // For now, we'll just check that the functions exist
-        let _setup_fn = setup::<rand::rngs::StdRng>;
-        let _prove_fn = prove::<rand::rngs::StdRng>;
-        let _verify_fn = verify;
+    fn test_challenge_verification() {
+        // Create a deterministic RNG for testing
+        let mut rng = StdRng::seed_from_u64(12345);
+
+        // Create a dummy VoleProof with incorrect challenges
+        let mut vole_proof = VoleProof {
+            vole_challenge: F128b::ONE,
+            witness_commitment: vec![F64b::ONE, F64b::ONE],
+            witness_challenges: vec![F128b::ONE, F128b::ONE], // Incorrect challenges
+            degree_0_commitment: F128b::ONE,
+            degree_1_commitment: F128b::ONE,
+            deccomitment_challenge: F128b::ONE,
+            partial_decommitment: PartialDecommitment {
+                verifier_key: F128b::ONE,
+                witness_voles: vec![vec![F8b::ONE]],
+                mask_voles: [F128b::ZERO; 128],
+            },
+        };
+
+        // Setup keys
+        let keys = setup(&mut rng).unwrap();
+
+        // Generate a proof, which should update the challenges correctly
+        let snark_proof = prove(&mut vole_proof, &keys, &mut rng).unwrap();
+
+        // Verify the proof - should succeed because challenges were updated
+        let result = verify(&snark_proof, &keys, &vole_proof).unwrap();
+        assert!(
+            result,
+            "Verification should succeed with correct challenges"
+        );
+
+        // Now tamper with the challenges
+        let mut tampered_proof = vole_proof.clone();
+        tampered_proof.witness_challenges = vec![F128b::ZERO, F128b::ZERO];
+
+        // Verify the tampered proof - should fail
+        let result = verify(&snark_proof, &keys, &tampered_proof).unwrap();
+        assert!(
+            !result,
+            "Verification should fail with incorrect challenges"
+        );
     }
 }
