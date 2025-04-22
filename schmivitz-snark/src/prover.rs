@@ -56,7 +56,6 @@ pub struct SnarkKeys {
     pub verification_key: VerifyingKey<Bn254>,
 }
 
-// todo: implement the conversion from the Schmivitz proof to the VoleProof
 pub fn convert_proof(schmivitz_proof: &Proof<InsecureVole>) -> Result<VoleProof> {
     let vole_proof = VoleProof {
         vole_challenge: convert_challenge(schmivitz_proof.vole_challenge)?,
@@ -111,7 +110,6 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
     }
 
     let solidity_verifier = Groth16::<Bn254>::export(&verification_key);
-    // todo: deploy contract
 
     let output_path = output_dir.join("vole_verifier.sol");
     fs::write(&output_path, solidity_verifier)?;
