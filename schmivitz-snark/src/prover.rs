@@ -140,7 +140,7 @@ pub fn prove<R: Rng + CryptoRng>(
     transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
 
     let witness_challenge =
-        transcript_wrapper.extract_witness_challenges(vole_proof.witness_commitment.len());
+        transcript_wrapper.extract_witness_challenges(vole_proof.witness_challenges.len());
 
     transcript_wrapper.append_polynomial_commitments(
         f128b_to_ark(&vole_proof.degree_0_commitment),
@@ -197,7 +197,7 @@ pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof
     transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
 
     let expected_witness_challenges =
-        transcript_wrapper.extract_witness_challenges(vole_proof.witness_commitment.len());
+        transcript_wrapper.extract_witness_challenges(vole_proof.witness_challenges.len());
     if expected_witness_challenges
         != vole_proof
             .witness_challenges
