@@ -121,15 +121,12 @@ mod tests {
 
     #[test]
     /// Test error handling for invalid inputs
-    fn test_error_handling() {
+    fn test_empty_inputs() {
         let cs = create_cs();
-
-        // Create empty inputs
         let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
         let partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
         let verifier_key = create_fp_var(cs.clone(), 5);
 
-        // Compute masked witnesses with empty inputs
         let result = MaskedWitnessGadget::compute(
             cs.clone(),
             &witness_commitment,
@@ -137,18 +134,42 @@ mod tests {
             &verifier_key,
         );
 
-        // This should succeed with an empty result
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
+    }
 
-        // Test with non-empty witness but empty decommitment
-        let _witness_commitment = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
-        let _partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
+    #[test]
+    fn test_mismatched_lengths() {
+        let cs = create_cs();
+        let witness_commitment = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
+        let partial_decommitment = vec![create_fp_var(cs.clone(), 3)]; // Shorter than witness_commitment
+        let verifier_key = create_fp_var(cs.clone(), 5);
 
-        // In a real implementation, we would add explicit length checks
-        // and return an error if the lengths don't match.
-        // For now, we'll just note that this would cause a panic in the current implementation.
-        println!("Note: In a production implementation, we would add explicit length checks");
+        let result = MaskedWitnessGadget::compute(
+            cs.clone(),
+            &witness_commitment,
+            &partial_decommitment,
+            &verifier_key,
+        );
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_witness_with_decommitment() {
+        let cs = create_cs();
+        let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
+        let partial_decommitment = vec![create_fp_var(cs.clone(), 3)];
+        let verifier_key = create_fp_var(cs.clone(), 5);
+
+        let result = MaskedWitnessGadget::compute(
+            cs.clone(),
+            &witness_commitment,
+            &partial_decommitment,
+            &verifier_key,
+        );
+
+        assert!(result.is_err());
     }
 
     #[test]
