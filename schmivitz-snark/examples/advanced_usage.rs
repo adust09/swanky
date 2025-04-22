@@ -2,7 +2,7 @@ use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, Proof};
-use schmivitz_snark::{convert_proof, prove, setup, verify, SnarkProof};
+use schmivitz_snark::{convert_proof, prove, setup, verify};
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -14,17 +14,14 @@ fn main() -> Result<()> {
         circuit;
         @type field 2;
         @begin
-          $0 ... $3 <- @private(0);
-          
-          $4 <- @add(0: $0, $1);
-          $5 <- @mul(0: $0, $1);
-          $6 <- @add(0: $2, $3);
-          $7 <- @mul(0: $2, $3);
-          
-          $8 <- @add(0: $4, $7);
-          $9 <- @mul(0: $5, $6);
-          
-          $10 <- @add(0: $8, $9);
+            $0 ... $3 <- @private(0);
+            $4 <- @add(0: $0, $1);
+            $5 <- @mul(0: $0, $1);
+            $6 <- @add(0: $2, $3);
+            $7 <- @mul(0: $2, $3);
+            $8 <- @add(0: $4, $7);
+            $9 <- @mul(0: $5, $6);
+            $10 <- @add(0: $8, $9);
         @end ";
     let circuit = Cursor::new(circuit_bytes.as_bytes());
 

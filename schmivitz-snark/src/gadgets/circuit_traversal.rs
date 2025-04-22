@@ -488,10 +488,9 @@ mod tests {
 
     #[test]
     /// Test with different witness challenge patterns
-    fn test_different_challenge_patterns() {
+    fn test_alternating_challenge_patterns() {
         let cs = create_cs();
 
-        // Test case 1: Alternating challenges (1, 0, 1, 0, ...)
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),
             create_fp_var(cs.clone(), 0),
@@ -518,8 +517,10 @@ mod tests {
 
         assert_eq!(validation_aggregate.value().unwrap(), expected);
         assert!(cs.is_satisfied().unwrap());
+    }
 
-        // Test case 2: Increasing challenges (1, 2, 3, ...)
+    #[test]
+    fn test_increasing_challenge_patterns() {
         let cs = create_cs();
 
         let witness_challenges = vec![
@@ -551,11 +552,9 @@ mod tests {
     }
 
     #[test]
-    /// Test with edge cases (zero challenges, maximum field values)
-    fn test_edge_cases() {
+    fn test_all_zero_cases() {
         let cs = create_cs();
 
-        // Test case 1: All zeros
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 0),
             create_fp_var(cs.clone(), 0),
@@ -580,8 +579,9 @@ mod tests {
 
         assert_eq!(validation_aggregate.value().unwrap(), expected);
         assert!(cs.is_satisfied().unwrap());
-
-        // Test case 2: Large values (near field size)
+    }
+    #[test]
+    fn test_large_value_cases() {
         let cs = create_cs();
 
         // Use large values close to the field size
@@ -609,8 +609,10 @@ mod tests {
 
         assert_eq!(validation_aggregate.value().unwrap(), expected);
         assert!(cs.is_satisfied().unwrap());
+    }
 
-        // Test case 3: Empty inputs
+    #[test]
+    fn test_empty_input_cases() {
         let cs = create_cs();
 
         let witness_challenges: Vec<FpVar<Fr>> = vec![];
@@ -631,11 +633,9 @@ mod tests {
     }
 
     #[test]
-    /// Test error handling for invalid inputs
     fn test_error_handling() {
         let cs = create_cs();
 
-        // Test case: Mismatched lengths
         let witness_challenges = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
 
         let masked_witnesses = vec![
@@ -650,10 +650,8 @@ mod tests {
             &masked_witnesses,
         );
 
-        // Should return an error
         assert!(result.is_err());
 
-        // Check that the error is SynthesisError::Unsatisfiable
         match result {
             Err(SynthesisError::Unsatisfiable) => {}
             _ => panic!("Expected SynthesisError::Unsatisfiable"),
@@ -661,9 +659,7 @@ mod tests {
     }
 
     #[test]
-    /// Test constraint satisfaction for different circuit structures
     fn test_constraint_satisfaction() {
-        // Test case 1: Simple linear circuit
         let cs = create_cs();
 
         let witness_challenges = vec![
@@ -685,7 +681,6 @@ mod tests {
         )
         .unwrap();
 
-        // Check that constraints are satisfied
         assert!(cs.is_satisfied().unwrap());
     }
 }
