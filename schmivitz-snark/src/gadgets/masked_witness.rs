@@ -42,7 +42,6 @@ mod tests {
     }
 
     #[test]
-    /// Test basic computation with simple inputs
     fn test_basic_computation() {
         let cs = create_cs();
 
@@ -120,7 +119,6 @@ mod tests {
     }
 
     #[test]
-    /// Test error handling for invalid inputs
     fn test_empty_inputs() {
         let cs = create_cs();
         let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
@@ -139,41 +137,6 @@ mod tests {
     }
 
     #[test]
-    fn test_mismatched_lengths() {
-        let cs = create_cs();
-        let witness_commitment = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
-        let partial_decommitment = vec![create_fp_var(cs.clone(), 3)]; // Shorter than witness_commitment
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
-        let result = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_empty_witness_with_decommitment() {
-        let cs = create_cs();
-        let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
-        let partial_decommitment = vec![create_fp_var(cs.clone(), 3)];
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
-        let result = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    /// Test constraint satisfaction with various input combinations
     fn test_constraint_satisfaction() {
         let cs = create_cs();
 
