@@ -81,22 +81,32 @@ pub struct VoleVerificationCircuit {
 impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
     fn generate_constraints(self, cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError> {
         // self.validate_witness()?;
-        let degree_0_commitment_var: FpVar<ark_ff::Fp256<ark_bn254::FrParameters>> =
-            FpVar::new_input(cs.clone(), || Ok(self.degree_0_commitment))?;
+        let degree_0_commitment_var =
+            FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
+                Ok(&self.degree_0_commitment)
+            })?;
         let degree_1_commitment_var =
-            FpVar::new_input(cs.clone(), || Ok(self.degree_1_commitment))?;
-        let verifier_key_var = FpVar::new_input(cs.clone(), || Ok(self.verifier_key))?;
-
-        let witness_commitment_var =
-            Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_commitment.clone()))?;
-        let partial_decommitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || {
-            Ok(self.partial_decommitment.clone())
+            FpVar::new_input(ark_relations::ns!(cs, "degree_1_commitment"), || {
+                Ok(&self.degree_1_commitment)
+            })?;
+        let verifier_key_var = FpVar::new_input(ark_relations::ns!(cs, "verifier_key"), || {
+            Ok(&self.verifier_key)
         })?;
-        let witness_challenges_var =
-            Vec::<FpVar<Bn254Fr>>::new_witness(cs.clone(), || Ok(self.witness_challenges.clone()))?;
+
+        let witness_commitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(
+            ark_relations::ns!(cs, "witness_commitment"),
+            || Ok(self.witness_commitment.clone()),
+        )?;
+        let partial_decommitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(
+            ark_relations::ns!(cs, "partial_decommitment"),
+            || Ok(self.partial_decommitment.clone()),
+        )?;
+        let witness_challenges_var = Vec::<FpVar<Bn254Fr>>::new_witness(
+            ark_relations::ns!(cs, "witness_challenges"),
+            || Ok(self.witness_challenges.clone()),
+        )?;
 
         let masked_witnesses_var = MaskedWitnessGadget::compute(
-            cs.clone(),
             &witness_commitment_var,
             &partial_decommitment_var,
             &verifier_key_var,
@@ -104,7 +114,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
 
         let validation_aggregate_var = if self.circuit_gates.is_empty() {
             CircuitTraversalGadget::compute_validation_aggregate(
-                cs.clone(),
                 &witness_challenges_var,
                 &masked_witnesses_var,
             )?
@@ -130,18 +139,13 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             )?
         };
 
-        let is_valid = ConstraintVerificationGadget::verify(
-            cs.clone(),
+        ConstraintVerificationGadget::verify(
             &validation_aggregate_var,
             &degree_0_commitment_var,
             &degree_1_commitment_var,
             &verifier_key_var,
-        )?;
-
-        // Enforce that the verification passes
-        // is_valid == 1 になっている。この後、groth16::proveに移る
-        is_valid.enforce_equal(&Boolean::constant(true))?;
-        Ok(())
+        )?
+        .enforce_equal(&Boolean::TRUE)
     }
 }
 
@@ -187,6 +191,8 @@ mod tests {
         let circuit = create_test_circuit();
         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let result = circuit.generate_constraints(cs.clone());
+        let constraints = cs.constraint_names();
+        println!("Generated constraints: {:?}", constraints);
         assert!(result.is_ok(), "Constraint generation should succeed");
 
         let num_constraints = cs.num_constraints();
@@ -217,6 +223,8 @@ mod tests {
         ];
         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let result = circuit.generate_constraints(cs.clone());
+        let constraints = cs.constraint_names();
+        println!("Generated constraints: {:?}", constraints);
         assert!(result.is_ok(), "Constraint generation should succeed");
 
         let num_constraints = cs.num_constraints();
@@ -245,6 +253,8 @@ mod tests {
 
         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let result = circuit.generate_constraints(cs.clone());
+        let constraints = cs.constraint_names();
+        println!("Generated constraints: {:?}", constraints);
         assert!(
             result.is_ok(),
             "Constraint generation should succeed with different sizes"

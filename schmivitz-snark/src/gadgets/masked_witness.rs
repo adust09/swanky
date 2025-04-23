@@ -1,14 +1,17 @@
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::fields::fp::FpVar;
-use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
+use ark_relations::r1cs::SynthesisError;
 use std::ops::{Add, Mul};
 
 pub struct MaskedWitnessGadget;
 
 impl MaskedWitnessGadget {
-    // L236~L271
+    // L236~
+    #[tracing::instrument(
+        target = "r1cs",
+        skip(witness_commitment, partial_decommitment, verifier_key)
+    )]
     pub fn compute(
-        _cs: ConstraintSystemRef<Bn254Fr>,
         witness_commitment: &[FpVar<Bn254Fr>],
         partial_decommitment: &[FpVar<Bn254Fr>],
         verifier_key: &FpVar<Bn254Fr>,
@@ -59,13 +62,9 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 5);
 
         // Compute masked witnesses
-        let masked_witnesses = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        )
-        .unwrap();
+        let masked_witnesses =
+            MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key)
+                .unwrap();
 
         // Verify results
         assert_eq!(masked_witnesses.len(), 3);
@@ -99,13 +98,9 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 1); // Identity for multiplication
 
         // Compute masked witnesses
-        let masked_witnesses = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        )
-        .unwrap();
+        let masked_witnesses =
+            MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key)
+                .unwrap();
 
         // Verify results
         assert_eq!(masked_witnesses.len(), 2);
@@ -125,12 +120,8 @@ mod tests {
         let partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
         let verifier_key = create_fp_var(cs.clone(), 5);
 
-        let result = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        );
+        let result =
+            MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key);
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
@@ -147,13 +138,9 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 13);
 
         // Compute masked witnesses
-        let masked_witnesses = MaskedWitnessGadget::compute(
-            cs.clone(),
-            &witness_commitment,
-            &partial_decommitment,
-            &verifier_key,
-        )
-        .unwrap();
+        let masked_witnesses =
+            MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key)
+                .unwrap();
 
         // Check that the constraints are satisfied
         assert!(cs.is_satisfied().unwrap());

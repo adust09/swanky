@@ -20,9 +20,6 @@ pub struct WireRange {
 /// This gadget implements a similar functionality to the VerifierTraverser in the original
 /// schmivitz implementation, but adapted for use with R1CS constraints.
 pub struct CircuitTraversalGadget {
-    /// Constraint system reference
-    cs: ConstraintSystemRef<Bn254Fr>,
-
     /// Fiat-Shamir challenges. There should be one for each polynomial (non-linear gate).
     challenges: Vec<FpVar<Bn254Fr>>,
 
@@ -59,7 +56,6 @@ impl CircuitTraversalGadget {
     ///
     /// * Result containing the CircuitTraversalGadget or a synthesis error
     pub fn new(
-        cs: ConstraintSystemRef<Bn254Fr>,
         challenges: Vec<FpVar<Bn254Fr>>,
         verifier_key: FpVar<Bn254Fr>,
         masked_witnesses: Vec<FpVar<Bn254Fr>>,
@@ -69,7 +65,6 @@ impl CircuitTraversalGadget {
         }
 
         Ok(Self {
-            cs,
             challenges,
             challenge_count: 0,
             verifier_key,
@@ -262,8 +257,8 @@ impl CircuitTraversalGadget {
     /// # Returns
     ///
     /// * Result containing the validation aggregate or a synthesis error
+    #[tracing::instrument(target = "r1cs", skip(witness_challenge, masked_witnesses))]
     pub fn compute_validation_aggregate(
-        _cs: ConstraintSystemRef<Bn254Fr>,
         witness_challenge: &[FpVar<Bn254Fr>],
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
@@ -302,6 +297,10 @@ impl CircuitTraversalGadget {
     /// # Returns
     ///
     /// * Result containing the validation aggregate or a synthesis error
+    #[tracing::instrument(
+        target = "r1cs",
+        skip(challenges, verifier_key, masked_witnesses, gates)
+    )]
     pub fn compute_validation_aggregate_with_circuit(
         cs: ConstraintSystemRef<Bn254Fr>,
         challenges: Vec<FpVar<Bn254Fr>>,
@@ -309,7 +308,7 @@ impl CircuitTraversalGadget {
         masked_witnesses: Vec<FpVar<Bn254Fr>>,
         gates: &[Gate],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
-        let mut traverser = Self::new(cs, challenges, verifier_key, masked_witnesses)?;
+        let mut traverser = Self::new(challenges, verifier_key, masked_witnesses)?;
 
         // Process each gate in the circuit
         for gate in gates {
@@ -364,24 +363,20 @@ mod tests {
     use ark_bn254::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
-    // Helper function to create a new constraint system
     fn create_cs() -> ConstraintSystemRef<Fr> {
         let cs = ConstraintSystem::<Fr>::new_ref();
         cs.set_optimization_goal(ark_relations::r1cs::OptimizationGoal::Constraints);
         cs
     }
 
-    // Helper function to create FpVar values
     fn create_fp_var(cs: ConstraintSystemRef<Fr>, value: u64) -> FpVar<Fr> {
         FpVar::new_witness(cs.clone(), || Ok(Fr::from(value))).unwrap()
     }
 
     #[test]
-    /// Test validation aggregate computation with simple circuit structures
     fn test_simple_validation_aggregate() {
         let cs = create_cs();
 
-        // Create test inputs for a simple circuit
         // Witness challenges
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),
@@ -399,9 +394,7 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
 
-        // Compute validation aggregate
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -418,11 +411,9 @@ mod tests {
     }
 
     #[test]
-    /// Test circuit traversal with a simple circuit
     fn test_circuit_traversal() {
         let cs = create_cs();
 
-        // Create test inputs
         let challenges = vec![
             create_fp_var(cs.clone(), 2), // For the multiplication gate
         ];
@@ -487,7 +478,6 @@ mod tests {
     }
 
     #[test]
-    /// Test with different witness challenge patterns
     fn test_alternating_challenge_patterns() {
         let cs = create_cs();
 
@@ -506,7 +496,6 @@ mod tests {
         ];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -538,7 +527,6 @@ mod tests {
         ];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -568,7 +556,6 @@ mod tests {
         ];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -598,7 +585,6 @@ mod tests {
         let masked_witnesses = vec![masked_witness1, masked_witness2];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -619,7 +605,6 @@ mod tests {
         let masked_witnesses: Vec<FpVar<Fr>> = vec![];
 
         let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )
@@ -645,7 +630,6 @@ mod tests {
         ];
 
         let result = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         );
@@ -675,7 +659,6 @@ mod tests {
         ];
 
         let _ = CircuitTraversalGadget::compute_validation_aggregate(
-            cs.clone(),
             &witness_challenges,
             &masked_witnesses,
         )

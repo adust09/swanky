@@ -1,6 +1,6 @@
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
-use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
+use ark_relations::r1cs::SynthesisError;
 
 pub struct ConstraintVerificationGadget;
 
@@ -23,7 +23,6 @@ impl ConstraintVerificationGadget {
     /// A boolean indicating whether the validation equation is satisfied
 
     pub fn verify(
-        _cs: ConstraintSystemRef<Bn254Fr>,
         validation: &FpVar<Bn254Fr>,
         degree_0_commitment: &FpVar<Bn254Fr>,
         degree_1_commitment: &FpVar<Bn254Fr>,
@@ -65,7 +64,6 @@ mod tests {
 
         // Verify
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_0_commitment,
             &degree_1_commitment,
@@ -104,7 +102,6 @@ mod tests {
 
         // Verify
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_0_commitment,
             &degree_1_commitment,
@@ -138,7 +135,6 @@ mod tests {
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
 
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_0_commitment,
             &degree_1_commitment,
@@ -176,7 +172,6 @@ mod tests {
         let validation = FpVar::new_witness(cs.clone(), || Ok(validation_val)).unwrap();
 
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_1_commitment,
             &verifier_key,
@@ -214,7 +209,6 @@ mod tests {
 
         // Verify after finalization
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_1_commitment,
             &verifier_key,
@@ -235,7 +229,6 @@ mod tests {
 
         // Verify with constants
         let result = ConstraintVerificationGadget::verify(
-            cs.clone(),
             &validation,
             &degree_0_commitment,
             &degree_1_commitment,
