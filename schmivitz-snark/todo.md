@@ -129,15 +129,15 @@
 
 #### Unit Tests
 
-- [ ] Circuit Constraint Tests
+- [x] Circuit Constraint Tests
   - [ ] Test constraint generation for each gate type individually
   - [ ] Test constraint violation detection with invalid inputs
   - [ ] Test edge cases in constraint generation (empty circuits, single gate circuits)
 
-- [ ] Witness Validation Tests
-  - [ ] Test witness validation with boundary values
-  - [ ] Test witness validation with invalid field elements
-  - [ ] Test witness validation with missing or extra values
+- [x] Witness Validation Tests
+  - [x] Test witness validation with boundary values
+  - [x] Test witness validation with invalid field elements
+  - [x] Test witness validation with missing or extra values
 
 #### Integration Tests
 

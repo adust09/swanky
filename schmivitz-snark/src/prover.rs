@@ -1,6 +1,5 @@
 use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
-use ark_serialize::CanonicalSerialize;
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
 use arkworks_solidity_verifier::SolidityVerifier;
@@ -15,7 +14,7 @@ use swanky_field_binary::{F128b, F64b, F8b};
 use swanky_serialization::CanonicalSerialize as _;
 
 use crate::{
-    circuit::VoleVerificationCircuit,
+    constraints::VoleVerificationCircuit,
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
     transcript::TranscriptWrapper,
 };
@@ -148,7 +147,6 @@ pub fn prove<R: Rng + CryptoRng>(
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
     );
-
     let circuit = VoleVerificationCircuit {
         // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
@@ -171,6 +169,7 @@ pub fn prove<R: Rng + CryptoRng>(
         circuit_gates: Vec::new(),
     };
 
+    // Error: unsatisfiable constraint system
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
 
     // Prepare the public inputs for verification

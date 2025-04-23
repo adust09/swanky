@@ -8,21 +8,16 @@ use std::{
     io::{Cursor, Write},
     path::Path,
 };
+use tempfile::tempdir;
 
 fn main() -> Result<()> {
     let circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
         @begin
-            $0 ... $3 <- @private(0);
-            $4 <- @add(0: $0, $1);
-            $5 <- @mul(0: $0, $1);
-            $6 <- @add(0: $2, $3);
-            $7 <- @mul(0: $2, $3);
-            $8 <- @add(0: $4, $7);
-            $9 <- @mul(0: $5, $6);
-            $10 <- @add(0: $8, $9);
-        @end ";
+            $0 ... $1 <- @private(0);
+            $2 <- @add(0: $0, $1);
+        @end";
     let circuit = Cursor::new(circuit_bytes.as_bytes());
 
     let private_input_bytes = "version 2.0.0;
@@ -31,16 +26,12 @@ fn main() -> Result<()> {
         @begin
             < 1 >;
             < 0 >;
-            < 1 >;
-            < 1 >;
         @end";
 
-    // Create a temporary file for private input
-    let temp_dir: tempfile::TempDir = tempfile::tempdir()?;
-    let private_input_path = temp_dir.path().join("private_input.txt");
-    let mut private_input_file = File::create(&private_input_path)?;
-    writeln!(private_input_file, "{}", private_input_bytes)?;
-    private_input_file.flush()?;
+    let dir = tempdir().unwrap();
+    let private_input_path = dir.path().join("private_inputs");
+    let mut private_input = File::create(private_input_path.clone()).unwrap();
+    writeln!(private_input, "{}", private_input_bytes).unwrap();
 
     let mut transcript = Transcript::new(b"schmivitz-snark example");
     let rng = &mut thread_rng();

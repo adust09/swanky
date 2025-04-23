@@ -1,4 +1,4 @@
-use crate::circuit::VoleVerificationCircuit;
+use crate::constraints::VoleVerificationCircuit;
 use ark_bn254::Fr as Bn254Fr;
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
 use ark_std::One;

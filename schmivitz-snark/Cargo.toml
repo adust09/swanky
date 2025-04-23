@@ -21,6 +21,8 @@ swanky-field.workspace = true
 swanky-field-binary.workspace = true
 swanky-serialization.workspace = true
 schmivitz = { path = "../schmivitz" }
+tracing = { version = "0.1", default-features = false, features = [ "attributes" ] }
+tracing-subscriber = { version = "0.2" }
 tempfile = "3.3.0"
 # other dependencies
 eyre = "0.6.12"

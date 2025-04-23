@@ -322,7 +322,7 @@ impl CircuitTraversalGadget {
                 }
                 Gate::PrivateInput { dst_range } => {
                     traverser.process_private_input(dst_range.clone())?;
-                } // Add other gate types as needed
+                }
             }
         }
 
@@ -339,7 +339,7 @@ impl CircuitTraversalGadget {
 }
 
 /// Represents a gate in the circuit
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Gate {
     /// Addition gate: dst = left + right
     Add {
