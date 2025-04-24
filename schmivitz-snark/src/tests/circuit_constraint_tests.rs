@@ -34,6 +34,8 @@ mod tests {
     fn test_constraint_generation_add_gate() {
         use ark_relations::r1cs::{ConstraintLayer, TracingMode};
         use tracing_subscriber::layer::SubscriberExt;
+
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let mut circuit = create_test_circuit();
 
         circuit.circuit_gates = vec![
@@ -52,7 +54,6 @@ mod tests {
         let subscriber = tracing_subscriber::Registry::default().with(layer);
         let _guard = tracing::subscriber::set_default(subscriber);
 
-        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let result = circuit.generate_constraints(cs.clone());
         assert!(result.is_ok(), "Constraint generation should succeed");
 
