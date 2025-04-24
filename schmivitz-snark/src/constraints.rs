@@ -2,9 +2,7 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{
-    CircuitTraversalGadget, ConstraintVerificationGadget, Gate, MaskedWitnessGadget,
-};
+use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget};
 
 pub struct VoleVerificationCircuit {
     // Public inputs
@@ -16,9 +14,6 @@ pub struct VoleVerificationCircuit {
     pub witness_commitment: Vec<Bn254Fr>,
     pub partial_decommitment: Vec<Bn254Fr>,
     pub witness_challenges: Vec<Bn254Fr>,
-
-    // Circuit description
-    pub circuit_gates: Vec<Gate>,
 }
 
 // impl VoleVerificationCircuit {
@@ -112,32 +107,10 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             &verifier_key_var,
         )?;
 
-        let validation_aggregate_var = if self.circuit_gates.is_empty() {
-            CircuitTraversalGadget::compute_validation_aggregate(
-                &witness_challenges_var,
-                &masked_witnesses_var,
-            )?
-        } else {
-            let num_mul_gates = self
-                .circuit_gates
-                .iter()
-                .filter(|gate| matches!(gate, Gate::Mul { .. }))
-                .count();
-
-            let challenges_to_use = if num_mul_gates <= witness_challenges_var.len() {
-                witness_challenges_var[..num_mul_gates].to_vec()
-            } else {
-                return Err(SynthesisError::Unsatisfiable);
-            };
-
-            CircuitTraversalGadget::compute_validation_aggregate_with_circuit(
-                cs.clone(),
-                challenges_to_use,
-                verifier_key_var.clone(),
-                masked_witnesses_var,
-                &self.circuit_gates,
-            )?
-        };
+        let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
+            &witness_challenges_var,
+            &masked_witnesses_var,
+        )?;
 
         ConstraintVerificationGadget::verify(
             &validation_aggregate_var,
@@ -152,7 +125,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{gadgets::Gate, WireRange};
     use ark_bn254::Fr as Bn254Fr;
     use ark_relations::r1cs::ConstraintSystem;
 
@@ -167,9 +139,6 @@ mod tests {
             witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)],
             partial_decommitment: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)],
             witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)],
-
-            // Circuit description
-            circuit_gates: Vec::new(),
         }
     }
 
@@ -183,11 +152,10 @@ mod tests {
         assert_eq!(circuit.witness_commitment.len(), 2);
         assert_eq!(circuit.partial_decommitment.len(), 2);
         assert_eq!(circuit.witness_challenges.len(), 2);
-        assert!(circuit.circuit_gates.is_empty());
     }
 
     #[test]
-    fn test_constraint_generation_empty_gates() {
+    fn test_constraint_generation() {
         let circuit = create_test_circuit();
         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
         let result = circuit.generate_constraints(cs.clone());
@@ -209,37 +177,6 @@ mod tests {
     }
 
     #[test]
-    fn test_constraint_generation_with_gates() {
-        let mut circuit = create_test_circuit();
-        circuit.circuit_gates = vec![
-            Gate::PrivateInput {
-                dst_range: WireRange { start: 0, end: 1 },
-            },
-            Gate::Add {
-                dst: 2,
-                left: 0,
-                right: 1,
-            },
-        ];
-        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
-        let result = circuit.generate_constraints(cs.clone());
-        let constraints = cs.constraint_names();
-        println!("Generated constraints: {:?}", constraints);
-        assert!(result.is_ok(), "Constraint generation should succeed");
-
-        let num_constraints = cs.num_constraints();
-        assert!(
-            num_constraints > 0,
-            "Expected constraints to be generated, but got {}",
-            num_constraints
-        );
-        assert!(
-            cs.is_satisfied().unwrap(),
-            "Constraints should be satisfied"
-        );
-    }
-
-    #[test]
     fn test_circuit_with_different_sizes() {
         let circuit = VoleVerificationCircuit {
             degree_0_commitment: Bn254Fr::from(1u64),
@@ -248,7 +185,6 @@ mod tests {
             witness_commitment: vec![Bn254Fr::from(4u64); 10],
             partial_decommitment: vec![Bn254Fr::from(6u64); 10],
             witness_challenges: vec![Bn254Fr::from(8u64); 10],
-            circuit_gates: Vec::new(),
         };
 
         let cs = ConstraintSystem::<Bn254Fr>::new_ref();

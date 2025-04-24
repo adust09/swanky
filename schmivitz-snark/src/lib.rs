@@ -12,8 +12,7 @@ pub use prover::{
 
 // Re-export gadgets for use in other crates
 pub use gadgets::{
-    CircuitTraversalGadget, ConstraintVerificationGadget, Gate, MaskedWitnessGadget, WireId,
-    WireRange,
+    CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget, WireId, WireRange,
 };
 
 // Re-export field conversion functions

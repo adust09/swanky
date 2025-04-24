@@ -97,7 +97,6 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
         witness_commitment: Vec::new(),
         partial_decommitment: Vec::new(),
         witness_challenges: Vec::new(),
-        circuit_gates: Vec::new(),
     };
 
     let (proving_key, verification_key) =
@@ -165,8 +164,6 @@ pub fn prove<R: Rng + CryptoRng>(
             .flat_map(|arr| arr.iter().map(f8b_to_ark))
             .collect(),
         witness_challenges,
-        // Circuit gates - currently empty, but could be populated with actual circuit gates
-        circuit_gates: Vec::new(),
     };
 
     // Error: unsatisfiable constraint system

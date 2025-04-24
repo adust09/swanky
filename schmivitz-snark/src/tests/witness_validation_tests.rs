@@ -19,9 +19,6 @@ mod tests {
             witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)],
             partial_decommitment: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)],
             witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)],
-
-            // Circuit description
-            circuit_gates: Vec::new(),
         }
     }
 

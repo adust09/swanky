@@ -1,6 +1,6 @@
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
-use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
+use ark_relations::r1cs::SynthesisError;
 use std::collections::HashMap;
 use std::ops::{Add, Mul};
 
@@ -283,78 +283,6 @@ impl CircuitTraversalGadget {
 
         Ok(validation_aggregate)
     }
-
-    /// Computes the validation aggregate by traversing a circuit with the given gates.
-    ///
-    /// # Arguments
-    ///
-    /// * `cs` - Constraint system reference
-    /// * `challenges` - Array of witness challenges
-    /// * `verifier_key` - Verifier key
-    /// * `masked_witnesses` - Array of masked witnesses computed from witness commitments
-    /// * `gates` - Array of gates in the circuit
-    ///
-    /// # Returns
-    ///
-    /// * Result containing the validation aggregate or a synthesis error
-    #[tracing::instrument(
-        target = "r1cs",
-        skip(challenges, verifier_key, masked_witnesses, gates)
-    )]
-    pub fn compute_validation_aggregate_with_circuit(
-        cs: ConstraintSystemRef<Bn254Fr>,
-        challenges: Vec<FpVar<Bn254Fr>>,
-        verifier_key: FpVar<Bn254Fr>,
-        masked_witnesses: Vec<FpVar<Bn254Fr>>,
-        gates: &[Gate],
-    ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
-        let mut traverser = Self::new(challenges, verifier_key, masked_witnesses)?;
-
-        // Process each gate in the circuit
-        for gate in gates {
-            match gate {
-                Gate::Add { dst, left, right } => {
-                    traverser.process_add(*dst, *left, *right)?;
-                }
-                Gate::Mul { dst, left, right } => {
-                    traverser.process_mul(*dst, *left, *right)?;
-                }
-                Gate::PrivateInput { dst_range } => {
-                    traverser.process_private_input(dst_range.clone())?;
-                }
-            }
-        }
-
-        // Check that all challenges and masked witnesses were used
-        if traverser.challenge_count != traverser.challenges.len() {
-            return Err(SynthesisError::Unsatisfiable);
-        }
-        if traverser.assigned_witness_count != traverser.masked_witnesses.len() {
-            return Err(SynthesisError::Unsatisfiable);
-        }
-
-        Ok(traverser.aggregate)
-    }
-}
-
-/// Represents a gate in the circuit
-#[derive(Clone, Debug)]
-pub enum Gate {
-    /// Addition gate: dst = left + right
-    Add {
-        dst: WireId,
-        left: WireId,
-        right: WireId,
-    },
-    /// Multiplication gate: dst = left * right
-    Mul {
-        dst: WireId,
-        left: WireId,
-        right: WireId,
-    },
-    /// Private input gate: assigns values to a range of wires
-    PrivateInput { dst_range: WireRange },
-    // Add other gate types as needed
 }
 
 #[cfg(test)]
@@ -418,62 +346,21 @@ mod tests {
             create_fp_var(cs.clone(), 2), // For the multiplication gate
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
-
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10), // For wire 0 (private input)
             create_fp_var(cs.clone(), 20), // For wire 1 (private input)
             create_fp_var(cs.clone(), 30), // For wire 3 (multiplication output)
         ];
 
-        // Create a simple circuit:
-        // Wire 0: private input = 10
-        // Wire 1: private input = 20
-        // Wire 2: add(0, 1) = 10 + 20 = 30
-        // Wire 3: mul(0, 1) = 10 * 20 = 200, but masked witness is 30
-        let gates = vec![
-            Gate::PrivateInput {
-                dst_range: WireRange { start: 0, end: 1 },
-            },
-            Gate::Add {
-                dst: 2,
-                left: 0,
-                right: 1,
-            },
-            Gate::Mul {
-                dst: 3,
-                left: 0,
-                right: 1,
-            },
-        ];
-
         // Compute validation aggregate
         let validation_aggregate =
-            CircuitTraversalGadget::compute_validation_aggregate_with_circuit(
-                cs.clone(),
-                challenges,
-                verifier_key.clone(),
-                masked_witnesses,
-                &gates,
-            )
-            .unwrap();
+            CircuitTraversalGadget::compute_validation_aggregate(&challenges, &masked_witnesses)
+                .unwrap();
 
-        // Expected calculation:
-        // - Wire 0 gets masked_witness[0] = 10
-        // - Wire 1 gets masked_witness[1] = 20
-        // - Wire 2 gets 10 + 20 = 30 (computed)
-        // - Wire 3 gets masked_witness[2] = 30
-        // - For mul gate: challenge * (left * right - dst * verifier_key)
-        //   = 2 * (10 * 20 - 30 * 5)
-        //   = 2 * (200 - 150)
-        //   = 2 * 50
-        //   = 100
         let expected = Fr::from(100u64);
 
-        // Check the result
         assert_eq!(validation_aggregate.value().unwrap(), expected);
 
-        // Check that constraints are satisfied
         assert!(cs.is_satisfied().unwrap());
     }
 
