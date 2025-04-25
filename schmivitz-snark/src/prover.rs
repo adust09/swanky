@@ -14,7 +14,7 @@ use swanky_field_binary::{F128b, F64b, F8b};
 use swanky_serialization::CanonicalSerialize as _;
 
 use crate::{
-    constraints::VoleVerificationCircuit,
+    constraints::VoleVerification,
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
     transcript::TranscriptWrapper,
 };
@@ -26,7 +26,7 @@ pub struct VoleProof {
     pub degree_0_commitment: F128b,
     pub degree_1_commitment: F128b,
     pub deccomitment_challenge: F128b,
-    pub partial_decommitment: PartialDecommitment,
+    pub partial_decommitment: PartialDecommitment, // ここの実装が現実と異なる。現実ではparamsなどを使っている
 }
 #[derive(Debug, Clone)]
 pub struct PartialDecommitment {
@@ -47,7 +47,7 @@ impl PartialDecommitment {
 
 pub struct SnarkProof {
     pub proof: Groth16Proof<Bn254>,
-    pub inputs: Vec<Bn254Fr>,
+    pub public_input: Vec<Bn254Fr>,
 }
 
 pub struct SnarkKeys {
@@ -89,8 +89,7 @@ fn convert_challenge(challenge: [u8; 16]) -> Result<F128b> {
 }
 
 pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
-    // Create a dummy circuit for setup
-    let dummy_circuit = VoleVerificationCircuit {
+    let dummy_circuit = VoleVerification {
         degree_1_commitment: Bn254Fr::from(0),
         degree_0_commitment: Bn254Fr::from(0),
         verifier_key: Bn254Fr::from(0),
@@ -146,7 +145,7 @@ pub fn prove<R: Rng + CryptoRng>(
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
     );
-    let circuit = VoleVerificationCircuit {
+    let circuit = VoleVerification {
         // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
         degree_1_commitment: f128b_to_ark(&vole_proof.degree_1_commitment),
@@ -170,13 +169,16 @@ pub fn prove<R: Rng + CryptoRng>(
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
 
     // Prepare the public inputs for verification
-    let inputs = vec![
+    let public_input = vec![
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
         f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
     ];
 
-    Ok(SnarkProof { proof, inputs })
+    Ok(SnarkProof {
+        proof,
+        public_input,
+    })
 }
 
 pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof) -> Result<bool> {
@@ -215,7 +217,7 @@ pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof
 
     let snark_verification = Groth16::<Bn254>::verify(
         &keys.verification_key,
-        &snark_proof.inputs,
+        &snark_proof.public_input,
         &snark_proof.proof,
     );
 

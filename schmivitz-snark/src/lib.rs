@@ -15,5 +15,8 @@ pub use gadgets::{
     CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget, WireId, WireRange,
 };
 
+pub use constraints::VoleVerification;
+pub use transcript::TranscriptWrapper;
+
 // Re-export field conversion functions
 pub use field_mappings::{ark_to_f128b, f128b_to_ark, f64b_to_ark, f8b_to_ark};

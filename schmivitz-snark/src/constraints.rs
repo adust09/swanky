@@ -4,7 +4,8 @@ use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisE
 
 use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget};
 
-pub struct VoleVerificationCircuit {
+#[derive(Debug, Clone)]
+pub struct VoleVerification {
     // Public inputs
     pub degree_0_commitment: Bn254Fr,
     pub degree_1_commitment: Bn254Fr,
@@ -24,24 +25,19 @@ pub struct VoleVerificationCircuit {
 //         Ok(())
 //     }
 
-//     fn validate_vector_sizes(&self) -> Result<(), SynthesisError> {
-//         if self.witness_commitment.is_empty() {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-//         if self.partial_decommitment.is_empty() {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-//         if self.witness_challenges.is_empty() {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-//         if self.witness_commitment.len() != self.partial_decommitment.len() {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-//         if self.witness_commitment.len() != self.witness_challenges.len() {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-//         Ok(())
+// fn validate_vector_sizes(&self) -> Result<(), SynthesisError> {
+//     if self.witness_commitment.is_empty() {
+//         return Err(SynthesisError::Unsatisfiable);
 //     }
+//     if self.partial_decommitment.is_empty() {
+//         return Err(SynthesisError::Unsatisfiable);
+//     }
+//     if self.witness_challenges.is_empty() {
+//         return Err(SynthesisError::Unsatisfiable);
+//     }
+
+//     Ok(())
+// }
 
 //     fn validate_witness_size_against_circuit(&self) -> Result<(), SynthesisError> {
 //         let max_wire_id = self.calculate_max_wire_id();
@@ -73,7 +69,7 @@ pub struct VoleVerificationCircuit {
 //     }
 // }
 
-impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
+impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
     fn generate_constraints(self, cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError> {
         // self.validate_witness()?;
         let degree_0_commitment_var =
@@ -101,24 +97,65 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationCircuit {
             || Ok(self.witness_challenges.clone()),
         )?;
 
+        // if witness_commitment_var.len() != partial_decommitment_var.len() {
+        //     println!("witness_commitment_var.len() != partial_decommitment_var.len()");
+        //     println!(
+        //         "witness_commitment_var: {:?}\n",
+        //         witness_commitment_var.len()
+        //     );
+        //     println!(
+        //         "partial_decommitment_var: {:?}\n",
+        //         partial_decommitment_var.len()
+        //     );
+        //     // setup時にここで死ぬ
+        //     return Err(SynthesisError::Unsatisfiable);
+        // }
+        // if witness_commitment_var.len() != witness_challenges_var.len() {
+        //     println!("witness_commitment_var.len() != witness_challenges_var.len()");
+        //     println!(
+        //         "witness_commitment_var: {:?}\n",
+        //         witness_commitment_var.len()
+        //     );
+        //     println!(
+        //         "witness_challenges_var: {:?}\n",
+        //         witness_challenges_var.len()
+        //     );
+        //     return Err(SynthesisError::Unsatisfiable);
+        // }
+
         let masked_witnesses_var = MaskedWitnessGadget::compute(
             &witness_commitment_var,
             &partial_decommitment_var,
             &verifier_key_var,
         )?;
 
+        // if witness_challenges_var.len() != masked_witnesses_var.len() {
+        //     println!("witness_challenges_var.len() != masked_witnesses_var.len()");
+        //     println!(
+        //         "witness_challenges_var: {:?}\n",
+        //         witness_challenges_var.len()
+        //     );
+        //     println!("masked_witnesses_var: {:?}\n", masked_witnesses_var.len());
+        //     return Err(SynthesisError::Unsatisfiable);
+        // }
+
         let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
             &witness_challenges_var,
             &masked_witnesses_var,
         )?;
 
-        ConstraintVerificationGadget::verify(
+        let result = ConstraintVerificationGadget::verify(
             &validation_aggregate_var,
             &degree_0_commitment_var,
             &degree_1_commitment_var,
             &verifier_key_var,
         )?
-        .enforce_equal(&Boolean::TRUE)
+        .enforce_equal(&Boolean::TRUE);
+        print!(
+            "Validation result: {:?} \n",
+            validation_aggregate_var.value()
+        );
+        result
     }
 }
 
@@ -128,8 +165,8 @@ mod tests {
     use ark_bn254::Fr as Bn254Fr;
     use ark_relations::r1cs::ConstraintSystem;
 
-    fn create_test_circuit() -> VoleVerificationCircuit {
-        VoleVerificationCircuit {
+    fn create_test_circuit() -> VoleVerification {
+        VoleVerification {
             // Public inputs
             degree_0_commitment: Bn254Fr::from(1u64),
             degree_1_commitment: Bn254Fr::from(2u64),
@@ -178,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_circuit_with_different_sizes() {
-        let circuit = VoleVerificationCircuit {
+        let circuit = VoleVerification {
             degree_0_commitment: Bn254Fr::from(1u64),
             degree_1_commitment: Bn254Fr::from(2u64),
             verifier_key: Bn254Fr::from(3u64),

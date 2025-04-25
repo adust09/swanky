@@ -291,31 +291,22 @@ mod tests {
     use ark_bn254::Fr;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
-    fn create_cs() -> ConstraintSystemRef<Fr> {
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        cs.set_optimization_goal(ark_relations::r1cs::OptimizationGoal::Constraints);
-        cs
-    }
-
     fn create_fp_var(cs: ConstraintSystemRef<Fr>, value: u64) -> FpVar<Fr> {
         FpVar::new_witness(cs.clone(), || Ok(Fr::from(value))).unwrap()
     }
 
     #[test]
     fn test_simple_validation_aggregate() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
-        // Witness challenges
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),
             create_fp_var(cs.clone(), 2),
             create_fp_var(cs.clone(), 3),
         ];
 
-        // Verifier key
         let _verifier_key = create_fp_var(cs.clone(), 5);
 
-        // Masked witnesses
         let masked_witnesses = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
@@ -340,9 +331,10 @@ mod tests {
 
     #[test]
     fn test_circuit_traversal() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let challenges = vec![
+        let witness_challenges = vec![
+            // test_constraint_satisfactionとの違いはベクトルの数
             create_fp_var(cs.clone(), 2), // For the multiplication gate
         ];
 
@@ -352,21 +344,21 @@ mod tests {
             create_fp_var(cs.clone(), 30), // For wire 3 (multiplication output)
         ];
 
-        // Compute validation aggregate
-        let validation_aggregate =
-            CircuitTraversalGadget::compute_validation_aggregate(&challenges, &masked_witnesses)
-                .unwrap();
+        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
+            &witness_challenges,
+            &masked_witnesses,
+        )
+        .unwrap();
 
         let expected = Fr::from(100u64);
 
         assert_eq!(validation_aggregate.value().unwrap(), expected);
-
         assert!(cs.is_satisfied().unwrap());
     }
 
     #[test]
     fn test_alternating_challenge_patterns() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),
@@ -397,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_increasing_challenge_patterns() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),
@@ -428,7 +420,7 @@ mod tests {
 
     #[test]
     fn test_all_zero_cases() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 0),
@@ -456,7 +448,7 @@ mod tests {
     }
     #[test]
     fn test_large_value_cases() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         // Use large values close to the field size
         let large_value = Fr::from(u64::MAX); // Maximum u64 value
@@ -486,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_empty_input_cases() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges: Vec<FpVar<Fr>> = vec![];
         let masked_witnesses: Vec<FpVar<Fr>> = vec![];
@@ -506,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_error_handling() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 2)];
 
@@ -531,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_constraint_satisfaction() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
         let witness_challenges = vec![
             create_fp_var(cs.clone(), 1),

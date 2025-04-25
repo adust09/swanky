@@ -232,7 +232,7 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
 
-        // Compute masked witnesses Q' = Q[..l] + d * Delta
+        // Compute masked witnesses Q' = Q[..l] + d * Delta (step.2)
         let d_delta = self
             .witness_commitment
             .iter()
@@ -267,10 +267,10 @@ impl Proof<InsecureVole> {
             })
             .collect::<Vec<_>>();
 
-        // Combine mask VOLEs to get q*
+        // Combine mask VOLEs to get q* (step.5)
         let validation_mask = combine(self.partial_decommitment.mask_voles());
 
-        // Run circuit traversal and get the aggregate value (part of c~)
+        // Run circuit traversal and get the aggregate value (part of c~) (step.6)
         let mut verifier_traverser = VerifierTraverser::new(
             self.witness_challenges.clone(),
             self.partial_decommitment.verifier_key(),
@@ -283,7 +283,7 @@ impl Proof<InsecureVole> {
         // Finally, compute c~ = aggregate + q*
         let validation = validation_aggregate + validation_mask;
 
-        // Check the main constraint of the proof!!
+        // Check the main constraint of the proof!! (step.7)
         let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
             + self.degree_0_commitment;
         if validation != actual_validation {

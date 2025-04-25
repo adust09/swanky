@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use crate::constraints::VoleVerificationCircuit;
+    use crate::constraints::VoleVerification;
     use ark_bn254::Fr as Bn254Fr;
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
     /// Helper function to create a test circuit with default values
-    fn create_test_circuit() -> VoleVerificationCircuit {
-        VoleVerificationCircuit {
+    fn create_test_circuit() -> VoleVerification {
+        VoleVerification {
             // Public inputs
             degree_0_commitment: Bn254Fr::from(1u64),
             degree_1_commitment: Bn254Fr::from(2u64),

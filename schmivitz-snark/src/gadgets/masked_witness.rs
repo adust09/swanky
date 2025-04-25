@@ -48,7 +48,6 @@ mod tests {
     fn test_basic_computation() {
         let cs = create_cs();
 
-        // Create test inputs
         let witness_commitment = vec![
             create_fp_var(cs.clone(), 1),
             create_fp_var(cs.clone(), 2),
@@ -60,8 +59,6 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
         let verifier_key = create_fp_var(cs.clone(), 5);
-
-        // Compute masked witnesses
         let masked_witnesses =
             MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key)
                 .unwrap();
@@ -82,7 +79,6 @@ mod tests {
     }
 
     #[test]
-    /// Test with edge cases (zero values, maximum field values)
     fn test_edge_cases() {
         let cs = create_cs();
 
@@ -115,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_empty_inputs() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
         let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
         let partial_decommitment: Vec<FpVar<Fr>> = Vec::new();
         let verifier_key = create_fp_var(cs.clone(), 5);
@@ -129,20 +125,17 @@ mod tests {
 
     #[test]
     fn test_constraint_satisfaction() {
-        let cs = create_cs();
+        let cs = ConstraintSystem::<Fr>::new_ref();
 
-        // Create test inputs
         let witness_commitment = vec![create_fp_var(cs.clone(), 7), create_fp_var(cs.clone(), 11)];
         let partial_decommitment =
             vec![create_fp_var(cs.clone(), 17), create_fp_var(cs.clone(), 19)];
         let verifier_key = create_fp_var(cs.clone(), 13);
 
-        // Compute masked witnesses
         let masked_witnesses =
             MaskedWitnessGadget::compute(&witness_commitment, &partial_decommitment, &verifier_key)
                 .unwrap();
 
-        // Check that the constraints are satisfied
         assert!(cs.is_satisfied().unwrap());
 
         // Verify the computed values
