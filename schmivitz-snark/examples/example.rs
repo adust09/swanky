@@ -5,16 +5,11 @@ use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
-use schmivitz::{
-    insecure::InsecureVole,
-    parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
-    Proof,
-};
+use schmivitz::{insecure::InsecureVole, Proof};
 use schmivitz_snark::{
-    convert_proof, f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar,
-    TranscriptWrapper, VoleProof, VoleVerification,
+    f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar, TranscriptWrapper,
+    VoleVerification,
 };
-use serde_json;
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -24,6 +19,7 @@ use swanky_field_binary::{F128b, F8b};
 use tempfile::tempdir;
 
 fn main() -> Result<()> {
+    // target circuit
     let circuit_bytes = "version 2.0.0;
         circuit;
         @type field 2;
@@ -54,11 +50,9 @@ fn main() -> Result<()> {
         &mut transcript,
         rng,
     )?;
-    let vole_proof = convert_proof(&schmivitz_proof)?;
-    let proof_json = serde_json::to_string_pretty(&vole_proof)?;
-    fs::write("proof.json", proof_json)?;
-    validate_proof(vole_proof.clone())?;
-    let circuit_defining_cs = build_circuit(vole_proof.clone());
+
+    validate_proof(schmivitz_proof.clone())?;
+    let circuit_defining_cs = build_circuit(schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit_defining_cs, &mut rng).unwrap();
@@ -72,7 +66,7 @@ fn main() -> Result<()> {
     fs::write(&output_path, solidity_verifier)?;
     println!("Solidity verifier generated at: {}", output_path.display());
 
-    let circuit_to_verify_against = build_circuit(vole_proof.clone());
+    let circuit_to_verify_against = build_circuit(schmivitz_proof.clone());
     let public_input = vec![
         circuit_to_verify_against.degree_0_commitment,
         circuit_to_verify_against.degree_1_commitment,
@@ -90,7 +84,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_circuit(vole_proof: VoleProof) -> VoleVerification {
+fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
     let mut transcript = Transcript::new(b"schmivitz-snark");
     let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
 
@@ -113,6 +107,7 @@ fn build_circuit(vole_proof: VoleProof) -> VoleVerification {
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
     );
+    // convert vole to arkworks variants
     VoleVerification {
         // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
@@ -142,42 +137,21 @@ fn build_circuit(vole_proof: VoleProof) -> VoleVerification {
     }
 }
 
-fn validate_proof(vole_proof: VoleProof) -> Result<()> {
-    // Validate the proof
-    println!(
-        "witness_commitment: {:?}",
-        vole_proof.witness_commitment.len()
-    );
-    println!(
-        "partial_decommitment: {:?}",
-        vole_proof.partial_decommitment.witness_voles().len()
-    );
-    println!(
-        "witness_challenge: {:?}",
-        vole_proof.witness_challenges.len()
-    );
-    if vole_proof.witness_commitment.len() != vole_proof.partial_decommitment.witness_voles().len()
+fn validate_proof(vole_proof: Proof<InsecureVole>) -> Result<()> {
+    if vole_proof.witness_commitment.len()
+        != vole_proof.partial_decommitment.extended_witness_length()
     {
         return Err(eyre::eyre!(
             "Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
             vole_proof.witness_commitment.len(),
-            vole_proof.partial_decommitment.witness_voles().len()
+            vole_proof.partial_decommitment.extended_witness_length()
         ));
     }
+
     if vole_proof.witness_challenges.len() > vole_proof.witness_commitment.len() {
         return Err(eyre::eyre!(
             "Invalid proof: More challenges {} than we have witnesses to commit to {}",
             vole_proof.witness_challenges.len(),
-            vole_proof.witness_commitment.len()
-        ));
-    }
-
-    let expected_commitment =
-        vole_proof.partial_decommitment.witness_voles().len() + REPETITION_PARAM * VOLE_SIZE_PARAM;
-    if vole_proof.witness_commitment.len() != expected_commitment {
-        return Err(eyre::eyre!(
-            "Invalid proof: Expected {} witness commitments, but got {}",
-            expected_commitment,
             vole_proof.witness_commitment.len()
         ));
     }

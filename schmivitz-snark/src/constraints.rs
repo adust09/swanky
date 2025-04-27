@@ -12,8 +12,9 @@ pub struct VoleVerification {
 
     // Private inputs (witness)
     pub witness_commitment: Vec<Bn254Fr>,
-    pub partial_decommitment: PartialDecommitmentVar,
     pub witness_challenges: Vec<Bn254Fr>,
+
+    pub partial_decommitment: PartialDecommitmentVar,
 }
 #[derive(Debug, Clone)]
 
