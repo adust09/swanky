@@ -2722,6 +2722,8 @@ dependencies = [
  "merlin",
  "rand",
  "schmivitz",
+ "serde",
+ "serde_json",
  "swanky-field",
  "swanky-field-binary",
  "swanky-serialization",

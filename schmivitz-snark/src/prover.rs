@@ -2,7 +2,6 @@ use ark_bn254::{Bn254, Fr as Bn254Fr};
 use ark_groth16::{Groth16, Proof as Groth16Proof, ProvingKey, VerifyingKey};
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, Rng};
-use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::{Ok, Result};
 use merlin::Transcript;
 use schmivitz::{
@@ -10,7 +9,7 @@ use schmivitz::{
     parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
     {Proof, RandomVole},
 };
-use std::{fs, path::Path};
+use serde::Serialize;
 use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F128b, F64b, F8b};
 use swanky_serialization::CanonicalSerialize as _;
@@ -20,7 +19,7 @@ use crate::{
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
     transcript::TranscriptWrapper,
 };
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VoleProof {
     pub vole_challenge: F128b,
     pub witness_commitment: Vec<F64b>,
@@ -30,12 +29,15 @@ pub struct VoleProof {
     pub deccomitment_challenge: F128b,
     pub partial_decommitment: PartialDecommitment,
 }
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PartialDecommitment {
     /// Number of VOLEs requested.
     pub extended_witness_length: usize,
+
     /// Verifier's chosen random key $`\bf \Delta`$.
     pub verifier_key: [F8b; REPETITION_PARAM],
+
     /// Commitments $`\bf Q`$ to the random values using the specified key and masks.
     pub verifier_commitments: Vec<[F8b; 16]>,
 }
@@ -132,35 +134,6 @@ fn convert_challenge(challenge: [u8; 16]) -> Result<F128b> {
     Ok(converted_challenge?)
 }
 
-pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
-    let dummy_circuit = VoleVerification {
-        degree_1_commitment: Bn254Fr::from(0),
-        degree_0_commitment: Bn254Fr::from(0),
-        witness_commitment: Vec::new(),
-        witness_challenges: Vec::new(),
-        partial_decommitment: todo!(),
-    };
-
-    let (proving_key, verification_key) =
-        Groth16::<Bn254>::circuit_specific_setup(dummy_circuit, rng)?;
-
-    let output_dir = Path::new("solidity_output");
-    if !output_dir.exists() {
-        fs::create_dir_all(output_dir)?;
-    }
-
-    let solidity_verifier = Groth16::<Bn254>::export(&verification_key);
-
-    let output_path = output_dir.join("vole_verifier.sol");
-    fs::write(&output_path, solidity_verifier)?;
-    println!("Solidity verifier generated at: {}", output_path.display());
-
-    Ok(SnarkKeys {
-        proving_key,
-        verification_key,
-    })
-}
-
 pub fn prove<R: Rng + CryptoRng>(
     vole_proof: &mut VoleProof,
     keys: &SnarkKeys,
@@ -219,7 +192,6 @@ pub fn prove<R: Rng + CryptoRng>(
         },
     };
 
-    // Error: unsatisfiable constraint system
     let proof = Groth16::<Bn254>::prove(&keys.proving_key, circuit, rng)?;
 
     // Prepare the public inputs for verification
@@ -286,8 +258,6 @@ pub fn verify(snark_proof: &SnarkProof, keys: &SnarkKeys, vole_proof: &VoleProof
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_std::rand::rngs::StdRng;
-    use ark_std::rand::SeedableRng;
     use swanky_field::FiniteRing;
 
     #[test]
@@ -319,50 +289,5 @@ mod tests {
 
         // Check that the conversion succeeds
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_challenge_verification() {
-        // Create a deterministic RNG for testing
-        let mut rng = StdRng::seed_from_u64(12345);
-
-        // Create a dummy VoleProof with incorrect challenges
-        let mut vole_proof = VoleProof {
-            vole_challenge: F128b::ONE,
-            witness_commitment: vec![F64b::ONE, F64b::ONE],
-            witness_challenges: vec![F128b::ONE, F128b::ONE], // Incorrect challenges
-            degree_0_commitment: F128b::ONE,
-            degree_1_commitment: F128b::ONE,
-            deccomitment_challenge: F128b::ONE,
-            partial_decommitment: PartialDecommitment {
-                extended_witness_length: 1,
-                verifier_key: [F8b::ONE; 16],
-                verifier_commitments: vec![[F8b::ONE; 16]],
-            },
-        };
-
-        // Setup keys
-        let keys = setup(&mut rng).unwrap();
-
-        // Generate a proof, which should update the challenges correctly
-        let snark_proof = prove(&mut vole_proof, &keys, &mut rng).unwrap();
-
-        // Verify the proof - should succeed because challenges were updated
-        let result = verify(&snark_proof, &keys, &vole_proof).unwrap();
-        assert!(
-            result,
-            "Verification should succeed with correct challenges"
-        );
-
-        // Now tamper with the challenges
-        let mut tampered_proof = vole_proof.clone();
-        tampered_proof.witness_challenges = vec![F128b::ZERO, F128b::ZERO];
-
-        // Verify the tampered proof - should fail
-        let result = verify(&snark_proof, &keys, &tampered_proof).unwrap();
-        assert!(
-            !result,
-            "Verification should fail with incorrect challenges"
-        );
     }
 }

@@ -7,7 +7,7 @@ mod tests;
 mod transcript;
 
 pub use prover::{
-    convert_proof, prove, setup, verify, PartialDecommitment, SnarkKeys, SnarkProof, VoleProof,
+    convert_proof, prove, verify, PartialDecommitment, SnarkKeys, SnarkProof, VoleProof,
 };
 
 // Re-export gadgets for use in other crates

@@ -14,6 +14,7 @@ use schmivitz_snark::{
     convert_proof, f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar,
     TranscriptWrapper, VoleProof, VoleVerification,
 };
+use serde_json;
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -54,6 +55,8 @@ fn main() -> Result<()> {
         rng,
     )?;
     let vole_proof = convert_proof(&schmivitz_proof)?;
+    let proof_json = serde_json::to_string_pretty(&vole_proof)?;
+    fs::write("proof.json", proof_json)?;
     validate_proof(vole_proof.clone())?;
     let circuit_defining_cs = build_circuit(vole_proof.clone());
 
