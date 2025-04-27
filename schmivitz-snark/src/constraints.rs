@@ -6,134 +6,67 @@ use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, Maske
 
 #[derive(Debug, Clone)]
 pub struct VoleVerification {
-    // Public inputs
-    pub degree_0_commitment: Bn254Fr,
-    pub degree_1_commitment: Bn254Fr,
-
-    // Private inputs (witness)
-    pub witness_commitment: Vec<Bn254Fr>,
-    pub witness_challenges: Vec<Bn254Fr>,
-
+    // vole_challenge(missed)
+    pub witness_commitment: Option<Vec<Bn254Fr>>,
+    pub witness_challenges: Option<Vec<Bn254Fr>>,
+    pub degree_0_commitment: Option<Bn254Fr>,
+    pub degree_1_commitment: Option<Bn254Fr>,
+    //decommitment_challenge(missed)
     pub partial_decommitment: PartialDecommitmentVar,
 }
 #[derive(Debug, Clone)]
 
 pub struct PartialDecommitmentVar {
-    pub verifier_key: Bn254Fr,
-    pub mask_voles: Vec<Bn254Fr>,
-    pub witness_voles: Vec<Bn254Fr>,
+    pub verifier_key: Option<Bn254Fr>,
+    pub mask_voles: Option<Vec<Bn254Fr>>,
+    pub witness_voles: Option<Vec<Bn254Fr>>,
 }
-
-// impl VoleVerificationCircuit {
-//     fn validate_witness(&self) -> Result<(), SynthesisError> {
-//         self.validate_vector_sizes()?;
-//         self.validate_witness_size_against_circuit()?;
-
-//         Ok(())
-//     }
-
-// fn validate_vector_sizes(&self) -> Result<(), SynthesisError> {
-//     if self.witness_commitment.is_empty() {
-//         return Err(SynthesisError::Unsatisfiable);
-//     }
-//     if self.partial_decommitment.is_empty() {
-//         return Err(SynthesisError::Unsatisfiable);
-//     }
-//     if self.witness_challenges.is_empty() {
-//         return Err(SynthesisError::Unsatisfiable);
-//     }
-
-//     Ok(())
-// }
-
-//     fn validate_witness_size_against_circuit(&self) -> Result<(), SynthesisError> {
-//         let max_wire_id = self.calculate_max_wire_id();
-
-//         if self.witness_commitment.len() < max_wire_id + 1 {
-//             return Err(SynthesisError::Unsatisfiable);
-//         }
-
-//         Ok(())
-//     }
-
-//     fn calculate_max_wire_id(&self) -> usize {
-//         let mut max_id = 0;
-
-//         for gate in &self.circuit_gates {
-//             match gate {
-//                 Gate::Add { dst, left, right } => {
-//                     max_id = max_id.max(*dst).max(*left).max(*right);
-//                 }
-//                 Gate::Mul { dst, left, right } => {
-//                     max_id = max_id.max(*dst).max(*left).max(*right);
-//                 }
-//                 Gate::PrivateInput { dst_range } => {
-//                     max_id = max_id.max(dst_range.end);
-//                 }
-//             }
-//         }
-//         max_id.try_into().unwrap()
-//     }
-// }
 
 impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
     fn generate_constraints(self, cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError> {
-        // self.validate_witness()?;
-        // constraintをかける
+        let witness_commitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(
+            ark_relations::ns!(cs, "witness_commitment"),
+            || {
+                self.witness_commitment
+                    .ok_or(SynthesisError::AssignmentMissing)
+            },
+        )?;
+
+        let witness_challenges_var = Vec::<FpVar<Bn254Fr>>::new_witness(
+            ark_relations::ns!(cs, "witness_challenges"),
+            || {
+                self.witness_challenges
+                    .ok_or(SynthesisError::AssignmentMissing)
+            },
+        )?;
         let degree_0_commitment_var =
             FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
-                Ok(&self.degree_0_commitment)
+                self.degree_0_commitment
+                    .ok_or(SynthesisError::AssignmentMissing)
             })?;
         let degree_1_commitment_var =
             FpVar::new_input(ark_relations::ns!(cs, "degree_1_commitment"), || {
-                Ok(&self.degree_1_commitment)
+                self.degree_1_commitment
+                    .ok_or(SynthesisError::AssignmentMissing)
             })?;
         let verifier_key_var = FpVar::new_input(ark_relations::ns!(cs, "verifier_key"), || {
-            Ok(&self.partial_decommitment.verifier_key)
+            self.partial_decommitment
+                .verifier_key
+                .ok_or(SynthesisError::AssignmentMissing)
         })?;
 
-        let witness_commitment_var = Vec::<FpVar<Bn254Fr>>::new_witness(
-            ark_relations::ns!(cs, "witness_commitment"),
-            || Ok(self.witness_commitment.clone()),
-        )?;
-        let witness_challenges_var = Vec::<FpVar<Bn254Fr>>::new_witness(
-            ark_relations::ns!(cs, "witness_challenges"),
-            || Ok(self.witness_challenges.clone()),
-        )?;
         let witness_voles_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(ark_relations::ns!(cs, "witness_voles"), || {
-                Ok(self.partial_decommitment.witness_voles.clone())
+                self.partial_decommitment
+                    .witness_voles
+                    .ok_or(SynthesisError::AssignmentMissing)
             })?;
         let mask_voles_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(ark_relations::ns!(cs, "mask_voles"), || {
-                Ok(self.partial_decommitment.mask_voles.clone())
+                self.partial_decommitment
+                    .mask_voles
+                    .ok_or(SynthesisError::AssignmentMissing)
             })?;
-
-        // if witness_commitment_var.len() != partial_decommitment_var.len() {
-        //     println!("witness_commitment_var.len() != partial_decommitment_var.len()");
-        //     println!(
-        //         "witness_commitment_var: {:?}\n",
-        //         witness_commitment_var.len()
-        //     );
-        //     println!(
-        //         "partial_decommitment_var: {:?}\n",
-        //         partial_decommitment_var.len()
-        //     );
-        //     // setup時にここで死ぬ
-        //     return Err(SynthesisError::Unsatisfiable);
-        // }
-        // if witness_commitment_var.len() != witness_challenges_var.len() {
-        //     println!("witness_commitment_var.len() != witness_challenges_var.len()");
-        //     println!(
-        //         "witness_commitment_var: {:?}\n",
-        //         witness_commitment_var.len()
-        //     );
-        //     println!(
-        //         "witness_challenges_var: {:?}\n",
-        //         witness_challenges_var.len()
-        //     );
-        //     return Err(SynthesisError::Unsatisfiable);
-        // }
 
         let masked_witnesses_var = MaskedWitnessGadget::compute(
             &witness_voles_var,
@@ -143,109 +76,72 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &witness_commitment_var,
         )?;
 
-        // if witness_challenges_var.len() != masked_witnesses_var.len() {
-        //     println!("witness_challenges_var.len() != masked_witnesses_var.len()");
-        //     println!(
-        //         "witness_challenges_var: {:?}\n",
-        //         witness_challenges_var.len()
-        //     );
-        //     println!("masked_witnesses_var: {:?}\n", masked_witnesses_var.len());
-        //     return Err(SynthesisError::Unsatisfiable);
-        // }
-
         let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
             &witness_challenges_var,
             &masked_witnesses_var,
         )?;
 
-        let result = ConstraintVerificationGadget::verify(
+        ConstraintVerificationGadget::verify(
             &validation_aggregate_var,
             &degree_0_commitment_var,
             &degree_1_commitment_var,
             &verifier_key_var,
         )?
-        .enforce_equal(&Boolean::TRUE);
-        print!(
-            "Validation result: {:?} \n",
-            validation_aggregate_var.value()
-        );
-        result
+        .enforce_equal(&Boolean::TRUE)
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use ark_bn254::Fr as Bn254Fr;
-//     use ark_relations::r1cs::ConstraintSystem;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ark_bn254::Fr as Bn254Fr;
+    use ark_relations::r1cs::ConstraintSystem;
 
-//     fn create_test_circuit() -> VoleVerification {
-//         VoleVerification {
-//             // Public inputs
-//             degree_0_commitment: Bn254Fr::from(1u64),
-//             degree_1_commitment: Bn254Fr::from(2u64),
-//             verifier_key: Bn254Fr::from(3u64),
+    fn create_test_circuit() -> VoleVerification {
+        VoleVerification {
+            witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)].into(),
+            witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)].into(),
+            degree_0_commitment: Some(Bn254Fr::from(1u64)),
+            degree_1_commitment: Some(Bn254Fr::from(2u64)),
+            partial_decommitment: PartialDecommitmentVar {
+                verifier_key: Some(Bn254Fr::from(3u64)),
+                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
+                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
+            },
+        }
+    }
 
-//             // Private inputs (witness)
-//             witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)],
-//             witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)],
-//         }
-//     }
+    #[test]
+    fn test_circuit_creation() {
+        let circuit = create_test_circuit();
 
-//     #[test]
-//     fn test_circuit_creation() {
-//         let circuit = create_test_circuit();
+        assert_eq!(circuit.degree_0_commitment, Some(Bn254Fr::from(1u64)));
+        assert_eq!(circuit.degree_1_commitment, Some(Bn254Fr::from(2u64)));
+        assert_eq!(
+            circuit.partial_decommitment.verifier_key,
+            Some(Bn254Fr::from(3u64))
+        );
+    }
 
-//         assert_eq!(circuit.degree_0_commitment, Bn254Fr::from(1u64));
-//         assert_eq!(circuit.degree_1_commitment, Bn254Fr::from(2u64));
-//         assert_eq!(circuit.verifier_key, Bn254Fr::from(3u64));
-//         assert_eq!(circuit.witness_commitment.len(), 2);
-//         assert_eq!(circuit.witness_challenges.len(), 2);
-//     }
+    #[test]
+    fn test_constraint_generation() {
+        let circuit = create_test_circuit();
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+        let result = circuit.generate_constraints(cs.clone());
+        let constraints = cs.constraint_names();
+        println!("Generated constraints: {:?}", constraints);
+        assert!(result.is_ok(), "Constraint generation should succeed");
 
-//     #[test]
-//     fn test_constraint_generation() {
-//         let circuit = create_test_circuit();
-//         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
-//         let result = circuit.generate_constraints(cs.clone());
-//         let constraints = cs.constraint_names();
-//         println!("Generated constraints: {:?}", constraints);
-//         assert!(result.is_ok(), "Constraint generation should succeed");
-
-//         let num_constraints = cs.num_constraints();
-//         println!("Number of constraints generated: {}", num_constraints);
-//         assert!(
-//             num_constraints > 0,
-//             "Expected constraints to be generated, but got {}",
-//             num_constraints
-//         );
-//         assert!(
-//             cs.is_satisfied().unwrap(),
-//             "Constraints should be satisfied"
-//         );
-//     }
-
-//     #[test]
-//     fn test_circuit_with_different_sizes() {
-//         let circuit = VoleVerification {
-//             degree_0_commitment: Bn254Fr::from(1u64),
-//             degree_1_commitment: Bn254Fr::from(2u64),
-//             verifier_key: Bn254Fr::from(3u64),
-//             witness_commitment: vec![Bn254Fr::from(4u64); 10],
-//             witness_challenges: vec![Bn254Fr::from(8u64); 10],
-//         };
-
-//         let cs = ConstraintSystem::<Bn254Fr>::new_ref();
-//         let result = circuit.generate_constraints(cs.clone());
-//         let constraints = cs.constraint_names();
-//         println!("Generated constraints: {:?}", constraints);
-//         assert!(
-//             result.is_ok(),
-//             "Constraint generation should succeed with different sizes"
-//         );
-//         assert!(
-//             cs.is_satisfied().unwrap(),
-//             "Constraints should be satisfied"
-//         );
-//     }
-// }
+        let num_constraints = cs.num_constraints();
+        println!("Number of constraints generated: {}", num_constraints);
+        assert!(
+            num_constraints > 0,
+            "Expected constraints to be generated, but got {}",
+            num_constraints
+        );
+        assert!(
+            cs.is_satisfied().unwrap(),
+            "Constraints should be satisfied"
+        );
+    }
+}

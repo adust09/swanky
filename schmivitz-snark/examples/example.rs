@@ -42,7 +42,7 @@ fn main() -> Result<()> {
     let mut private_input = File::create(private_input_path.clone()).unwrap();
     writeln!(private_input, "{}", private_input_bytes).unwrap();
 
-    let mut transcript = Transcript::new(b"schmivitz-snark example");
+    let mut transcript = Transcript::new(b"schmivitz-snark");
     let rng = &mut thread_rng();
     let schmivitz_proof: Proof<InsecureVole> = Proof::<InsecureVole>::prove(
         &mut circuit.clone(),
@@ -50,11 +50,12 @@ fn main() -> Result<()> {
         &mut transcript,
         rng,
     )?;
-    let mut test_verify_transcript = Transcript::new(b"schmivitz-snark example");
+    let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     assert!(schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .is_ok());
 
+    // circuit_specific_setupでpanicが発生するが、rollup.rsとの差分はこのbuildingの部分だけ
     let circuit_defining_cs = build_circuit(schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
@@ -71,9 +72,12 @@ fn main() -> Result<()> {
 
     let circuit_to_verify_against = build_circuit(schmivitz_proof.clone());
     let public_input = vec![
-        circuit_to_verify_against.degree_0_commitment,
-        circuit_to_verify_against.degree_1_commitment,
-        circuit_to_verify_against.partial_decommitment.verifier_key,
+        circuit_to_verify_against.degree_0_commitment.unwrap(),
+        circuit_to_verify_against.degree_1_commitment.unwrap(),
+        circuit_to_verify_against
+            .partial_decommitment
+            .verifier_key
+            .unwrap(),
     ];
 
     let snark_proof = Groth16::prove(&pk, circuit_to_verify_against, &mut rng)?;
@@ -112,30 +116,38 @@ fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
     );
     // convert vole to arkworks variants
     VoleVerification {
-        // Public Inputs
-        degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
-        degree_1_commitment: f128b_to_ark(&vole_proof.degree_1_commitment),
-        // Private Inputs
-        witness_commitment: vole_proof
-            .witness_commitment
-            .iter()
-            .map(f64b_to_ark)
-            .collect(),
+        // vole_challenge(missed)
+        witness_commitment: Some(
+            vole_proof
+                .witness_commitment
+                .iter()
+                .map(f64b_to_ark)
+                .collect(),
+        ),
+        witness_challenges: Some(witness_challenges),
+        degree_0_commitment: Some(f128b_to_ark(&vole_proof.degree_0_commitment)),
+        degree_1_commitment: Some(f128b_to_ark(&vole_proof.degree_1_commitment)),
+        // decommitment_challenge(missed)
         partial_decommitment: PartialDecommitmentVar {
-            verifier_key: f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
-            mask_voles: vole_proof
-                .partial_decommitment
-                .mask_voles()
-                .iter()
-                .map(|arg0: &F128b| f128b_to_ark(arg0))
-                .collect(),
-            witness_voles: vole_proof
-                .partial_decommitment
-                .witness_voles()
-                .iter()
-                .flat_map(|arr| arr.iter().copied().map(|value: F8b| f8b_to_ark(&value)))
-                .collect(),
+            verifier_key: Some(f128b_to_ark(
+                &vole_proof.partial_decommitment.verifier_key(),
+            )),
+            mask_voles: Some(
+                vole_proof
+                    .partial_decommitment
+                    .mask_voles()
+                    .iter()
+                    .map(|arg0: &F128b| f128b_to_ark(arg0))
+                    .collect(),
+            ),
+            witness_voles: Some(
+                vole_proof
+                    .partial_decommitment
+                    .witness_voles()
+                    .iter()
+                    .flat_map(|arr| arr.iter().copied().map(|value: F8b| f8b_to_ark(&value)))
+                    .collect(),
+            ),
         },
-        witness_challenges,
     }
 }

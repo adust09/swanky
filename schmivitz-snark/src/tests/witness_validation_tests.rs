@@ -11,16 +11,16 @@ mod tests {
     fn create_test_circuit() -> VoleVerification {
         VoleVerification {
             // Public inputs
-            degree_0_commitment: Bn254Fr::from(1u64),
-            degree_1_commitment: Bn254Fr::from(2u64),
+            degree_0_commitment: Some(Bn254Fr::from(1u64)),
+            degree_1_commitment: Some(Bn254Fr::from(2u64)),
 
             // Private inputs (witness)
-            witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)],
-            witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)],
+            witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)].into(),
+            witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)].into(),
             partial_decommitment: PartialDecommitmentVar {
-                verifier_key: Bn254Fr::from(3u64),
-                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)],
-                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)],
+                verifier_key: Some(Bn254Fr::from(3u64)),
+                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
+                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
             },
         }
     }
@@ -37,25 +37,29 @@ mod tests {
         let mut circuit = create_test_circuit();
 
         // Set witness values to boundary values
-        circuit.witness_commitment = vec![Bn254Fr::zero(), Bn254Fr::one(), Bn254Fr::from(u64::MAX)];
+        circuit.witness_commitment =
+            vec![Bn254Fr::zero(), Bn254Fr::one(), Bn254Fr::from(u64::MAX)].into();
 
         // Adjust other vectors to match the size
         circuit.partial_decommitment.mask_voles = vec![
             Bn254Fr::from(10u64),
             Bn254Fr::from(11u64),
             Bn254Fr::from(12u64),
-        ];
+        ]
+        .into();
         circuit.partial_decommitment.witness_voles = vec![
             Bn254Fr::from(13u64),
             Bn254Fr::from(14u64),
             Bn254Fr::from(15u64),
-        ];
+        ]
+        .into();
 
         circuit.witness_challenges = vec![
             Bn254Fr::from(16u64),
             Bn254Fr::from(17u64),
             Bn254Fr::from(18u64),
-        ];
+        ]
+        .into();
 
         let cs = create_cs();
 
@@ -98,7 +102,8 @@ mod tests {
             // we would use invalid field elements if possible
             Bn254Fr::from(u64::MAX),
             Bn254Fr::from(u64::MAX - 1),
-        ];
+        ]
+        .into();
 
         let cs = create_cs();
 
@@ -122,7 +127,7 @@ mod tests {
         let mut circuit = create_test_circuit();
 
         // Set witness values to an empty vector (missing values)
-        circuit.witness_commitment = vec![];
+        circuit.witness_commitment = vec![].into();
 
         let cs = create_cs();
 
@@ -146,14 +151,16 @@ mod tests {
         let mut circuit = create_test_circuit();
 
         // Set witness vectors to different sizes
-        circuit.witness_commitment = vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)];
-        circuit.partial_decommitment.mask_voles = vec![Bn254Fr::from(6u64)]; // One element short
-        circuit.partial_decommitment.witness_voles = vec![Bn254Fr::from(7u64), Bn254Fr::from(8u64)];
+        circuit.witness_commitment = vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)].into();
+        circuit.partial_decommitment.mask_voles = vec![Bn254Fr::from(6u64)].into(); // One element short
+        circuit.partial_decommitment.witness_voles =
+            vec![Bn254Fr::from(7u64), Bn254Fr::from(8u64)].into();
         circuit.witness_challenges = vec![
             Bn254Fr::from(9u64),
             Bn254Fr::from(10u64),
             Bn254Fr::from(11u64),
-        ]; // One element extra
+        ]
+        .into(); // One element extra
 
         let cs = create_cs();
 
