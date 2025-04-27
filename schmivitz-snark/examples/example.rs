@@ -50,8 +50,11 @@ fn main() -> Result<()> {
         &mut transcript,
         rng,
     )?;
+    let mut test_verify_transcript = Transcript::new(b"schmivitz-snark example");
+    assert!(schmivitz_proof
+        .verify(&mut circuit.clone(), &mut test_verify_transcript)
+        .is_ok());
 
-    validate_proof(schmivitz_proof.clone())?;
     let circuit_defining_cs = build_circuit(schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
@@ -135,26 +138,4 @@ fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
         },
         witness_challenges,
     }
-}
-
-fn validate_proof(vole_proof: Proof<InsecureVole>) -> Result<()> {
-    if vole_proof.witness_commitment.len()
-        != vole_proof.partial_decommitment.extended_witness_length()
-    {
-        return Err(eyre::eyre!(
-            "Invalid proof: Did not commit to the same number of witnesses {} as there are VOLEs {}",
-            vole_proof.witness_commitment.len(),
-            vole_proof.partial_decommitment.extended_witness_length()
-        ));
-    }
-
-    if vole_proof.witness_challenges.len() > vole_proof.witness_commitment.len() {
-        return Err(eyre::eyre!(
-            "Invalid proof: More challenges {} than we have witnesses to commit to {}",
-            vole_proof.witness_challenges.len(),
-            vole_proof.witness_commitment.len()
-        ));
-    }
-
-    Ok(())
 }
