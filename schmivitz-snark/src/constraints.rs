@@ -31,7 +31,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .ok_or(SynthesisError::AssignmentMissing)
             },
         )?;
-
         let witness_challenges_var = Vec::<FpVar<Bn254Fr>>::new_witness(
             ark_relations::ns!(cs, "witness_challenges"),
             || {
@@ -39,16 +38,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .ok_or(SynthesisError::AssignmentMissing)
             },
         )?;
-        let degree_0_commitment_var =
-            FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
-                self.degree_0_commitment
-                    .ok_or(SynthesisError::AssignmentMissing)
-            })?;
-        let degree_1_commitment_var =
-            FpVar::new_input(ark_relations::ns!(cs, "degree_1_commitment"), || {
-                self.degree_1_commitment
-                    .ok_or(SynthesisError::AssignmentMissing)
-            })?;
         let verifier_key_var = FpVar::new_input(ark_relations::ns!(cs, "verifier_key"), || {
             self.partial_decommitment
                 .verifier_key
@@ -61,31 +50,35 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .witness_voles
                     .ok_or(SynthesisError::AssignmentMissing)
             })?;
-        let mask_voles_var =
-            Vec::<FpVar<Bn254Fr>>::new_witness(ark_relations::ns!(cs, "mask_voles"), || {
-                self.partial_decommitment
-                    .mask_voles
-                    .ok_or(SynthesisError::AssignmentMissing)
-            })?;
 
         let masked_witnesses_var = MaskedWitnessVar::compute(
-            &witness_voles_var,
-            &mask_voles_var,
-            &verifier_key_var,
-            &witness_challenges_var,
             &witness_commitment_var,
+            &verifier_key_var,
+            &witness_voles_var,
         )?;
 
+        // witness_challenges_varとverifier_key_varは繰り返し使われている
         let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
             &witness_challenges_var,
             &masked_witnesses_var,
         )?;
 
+        let degree_0_commitment_var =
+            FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
+                self.degree_0_commitment
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+        let degree_1_commitment_var =
+            FpVar::new_input(ark_relations::ns!(cs, "degree_1_commitment"), || {
+                self.degree_1_commitment
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+
         ConstraintVerificationGadget::verify(
-            &validation_aggregate_var,
             &degree_0_commitment_var,
             &degree_1_commitment_var,
             &verifier_key_var,
+            &validation_aggregate_var,
         )?
         .enforce_equal(&Boolean::TRUE)
     }

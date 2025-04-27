@@ -6,13 +6,11 @@ pub struct MaskedWitnessVar;
 
 impl MaskedWitnessVar {
     // L236~
-    #[tracing::instrument(target = "r1cs", skip(verifier_key))]
+    #[tracing::instrument(target = "r1cs", skip(witness_commitment, verifier_key, witness_voles))]
     pub fn compute(
-        witness_voles: &[FpVar<Bn254Fr>],
-        masked_voles: &[FpVar<Bn254Fr>],
-        verifier_key: &FpVar<Bn254Fr>,
-        witness_challenge: &[FpVar<Bn254Fr>],
         witness_commitment: &Vec<FpVar<Bn254Fr>>,
+        verifier_key: &FpVar<Bn254Fr>,
+        witness_voles: &[FpVar<Bn254Fr>],
     ) -> Result<Vec<FpVar<Bn254Fr>>, SynthesisError> {
         // Based on the test cases and the original code in proof.rs, we need to:
         // 1. Calculate d_delta by multiplying each witness commitment with the verifier key
@@ -88,31 +86,16 @@ mod tests {
             create_fp_var(cs.clone(), 2),
             create_fp_var(cs.clone(), 3),
         ];
-        let witness_voles = vec![
+        let masked_voles = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
             create_fp_var(cs.clone(), 30),
         ];
-        let masked_voles = vec![
-            create_fp_var(cs.clone(), 100),
-            create_fp_var(cs.clone(), 200),
-            create_fp_var(cs.clone(), 300),
-        ];
-        let verifier_key = create_fp_var(cs.clone(), 5);
-        let witness_challenge = vec![
-            create_fp_var(cs.clone(), 1),
-            create_fp_var(cs.clone(), 1),
-            create_fp_var(cs.clone(), 1),
-        ];
 
-        let masked_witnesses = MaskedWitnessVar::compute(
-            &witness_voles,
-            &masked_voles,
-            &verifier_key,
-            &witness_challenge,
-            &witness_commitment,
-        )
-        .unwrap();
+        let verifier_key = create_fp_var(cs.clone(), 5);
+
+        let masked_witnesses =
+            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &masked_voles).unwrap();
 
         // Verify results
         assert_eq!(masked_witnesses.len(), 3);
@@ -138,18 +121,10 @@ mod tests {
             create_fp_var(cs.clone(), u64::MAX),
         ];
         let witness_voles = vec![create_fp_var(cs.clone(), 0), create_fp_var(cs.clone(), 1)];
-        let masked_voles = vec![create_fp_var(cs.clone(), 0), create_fp_var(cs.clone(), 1)];
         let verifier_key = create_fp_var(cs.clone(), 1);
-        let witness_challenge = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 1)];
 
-        let masked_witnesses = MaskedWitnessVar::compute(
-            &witness_voles,
-            &masked_voles,
-            &verifier_key,
-            &witness_challenge,
-            &witness_commitment,
-        )
-        .unwrap();
+        let masked_witnesses =
+            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
         assert_eq!(masked_witnesses.len(), 2);
         assert_eq!(masked_witnesses[0].value().unwrap(), Fr::from(1));
@@ -161,17 +136,9 @@ mod tests {
         let cs = create_cs();
         let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
         let witness_voles: Vec<FpVar<Fr>> = Vec::new();
-        let masked_voles: Vec<FpVar<Fr>> = Vec::new();
         let verifier_key = create_fp_var(cs.clone(), 5);
-        let witness_challenge: Vec<FpVar<Fr>> = Vec::new();
 
-        let result = MaskedWitnessVar::compute(
-            &witness_voles,
-            &masked_voles,
-            &verifier_key,
-            &witness_challenge,
-            &witness_commitment,
-        );
+        let result = MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles);
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().len(), 0);
@@ -183,21 +150,10 @@ mod tests {
 
         let witness_commitment = vec![create_fp_var(cs.clone(), 7), create_fp_var(cs.clone(), 11)];
         let witness_voles = vec![create_fp_var(cs.clone(), 17), create_fp_var(cs.clone(), 19)];
-        let masked_voles = vec![
-            create_fp_var(cs.clone(), 100),
-            create_fp_var(cs.clone(), 200),
-        ];
         let verifier_key = create_fp_var(cs.clone(), 13);
-        let witness_challenge = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 1)];
 
-        let masked_witnesses = MaskedWitnessVar::compute(
-            &witness_voles,
-            &masked_voles,
-            &verifier_key,
-            &witness_challenge,
-            &witness_commitment,
-        )
-        .unwrap();
+        let masked_witnesses =
+            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
         assert!(cs.is_satisfied().unwrap());
 

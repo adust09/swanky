@@ -21,11 +21,15 @@ impl ConstraintVerificationGadget {
     /// # Returns
     /// A boolean indicating whether the validation equation is satisfied
 
+    #[tracing::instrument(
+        target = "r1cs",
+        skip(degree_0_commitment, degree_1_commitment, verifier_key, validation)
+    )]
     pub fn verify(
-        validation: &FpVar<Bn254Fr>,
         degree_0_commitment: &FpVar<Bn254Fr>,
         degree_1_commitment: &FpVar<Bn254Fr>,
         verifier_key: &FpVar<Bn254Fr>,
+        validation: &FpVar<Bn254Fr>,
     ) -> Result<Boolean<Bn254Fr>, SynthesisError> {
         // L287-L292
         // Calculate actual_validation = degree_1_commitment * verifier_key + degree_0_commitment
