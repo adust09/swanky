@@ -10,7 +10,7 @@ pub use prover::{SnarkKeys, SnarkProof};
 
 // Re-export gadgets for use in other crates
 pub use gadgets::{
-    CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget, WireId, WireRange,
+    CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessVar, WireId, WireRange,
 };
 
 pub use constraints::{PartialDecommitmentVar, VoleVerification};

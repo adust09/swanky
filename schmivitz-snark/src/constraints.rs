@@ -2,16 +2,16 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget};
+use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessVar};
 
 #[derive(Debug, Clone)]
 pub struct VoleVerification {
-    // vole_challenge(missed)
+    // vole_challenge(missed but only used in outside of verification logic)
     pub witness_commitment: Option<Vec<Bn254Fr>>,
     pub witness_challenges: Option<Vec<Bn254Fr>>,
     pub degree_0_commitment: Option<Bn254Fr>,
     pub degree_1_commitment: Option<Bn254Fr>,
-    //decommitment_challenge(missed)
+    //decommitment_challenge(missed but only used in outside of verification logic)
     pub partial_decommitment: PartialDecommitmentVar,
 }
 #[derive(Debug, Clone)]
@@ -68,7 +68,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .ok_or(SynthesisError::AssignmentMissing)
             })?;
 
-        let masked_witnesses_var = MaskedWitnessGadget::compute(
+        let masked_witnesses_var = MaskedWitnessVar::compute(
             &witness_voles_var,
             &mask_voles_var,
             &verifier_key_var,

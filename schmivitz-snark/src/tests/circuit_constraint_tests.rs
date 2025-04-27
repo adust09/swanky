@@ -7,16 +7,16 @@ mod tests {
     fn create_test_circuit() -> VoleVerification {
         VoleVerification {
             // Public inputs
-            degree_0_commitment: Bn254Fr::from(1u64),
-            degree_1_commitment: Bn254Fr::from(2u64),
+            degree_0_commitment: Some(Bn254Fr::from(1u64)),
+            degree_1_commitment: Some(Bn254Fr::from(2u64)),
 
             // Private inputs (witness)
-            witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)],
-            witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)],
+            witness_commitment: vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)].into(),
+            witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)].into(),
             partial_decommitment: PartialDecommitmentVar {
-                verifier_key: Bn254Fr::from(3u64),
-                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)],
-                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)],
+                verifier_key: Some(Bn254Fr::from(3u64)),
+                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
+                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
             },
         }
     }

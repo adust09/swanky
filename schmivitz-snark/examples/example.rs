@@ -116,7 +116,7 @@ fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
     );
     // convert vole to arkworks variants
     VoleVerification {
-        // vole_challenge(missed)
+        // vole_challenge(missed but only used in outside of verification logic)
         witness_commitment: Some(
             vole_proof
                 .witness_commitment
@@ -127,7 +127,7 @@ fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
         witness_challenges: Some(witness_challenges),
         degree_0_commitment: Some(f128b_to_ark(&vole_proof.degree_0_commitment)),
         degree_1_commitment: Some(f128b_to_ark(&vole_proof.degree_1_commitment)),
-        // decommitment_challenge(missed)
+        // decommitment_challenge(missed but only used in outside of verification logic)
         partial_decommitment: PartialDecommitmentVar {
             verifier_key: Some(f128b_to_ark(
                 &vole_proof.partial_decommitment.verifier_key(),

@@ -2,9 +2,9 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::r1cs::SynthesisError;
 
-pub struct MaskedWitnessGadget;
+pub struct MaskedWitnessVar;
 
-impl MaskedWitnessGadget {
+impl MaskedWitnessVar {
     // L236~
     #[tracing::instrument(target = "r1cs", skip(verifier_key))]
     pub fn compute(
@@ -105,7 +105,7 @@ mod tests {
             create_fp_var(cs.clone(), 1),
         ];
 
-        let masked_witnesses = MaskedWitnessGadget::compute(
+        let masked_witnesses = MaskedWitnessVar::compute(
             &witness_voles,
             &masked_voles,
             &verifier_key,
@@ -142,7 +142,7 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 1);
         let witness_challenge = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 1)];
 
-        let masked_witnesses = MaskedWitnessGadget::compute(
+        let masked_witnesses = MaskedWitnessVar::compute(
             &witness_voles,
             &masked_voles,
             &verifier_key,
@@ -165,7 +165,7 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 5);
         let witness_challenge: Vec<FpVar<Fr>> = Vec::new();
 
-        let result = MaskedWitnessGadget::compute(
+        let result = MaskedWitnessVar::compute(
             &witness_voles,
             &masked_voles,
             &verifier_key,
@@ -190,7 +190,7 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 13);
         let witness_challenge = vec![create_fp_var(cs.clone(), 1), create_fp_var(cs.clone(), 1)];
 
-        let masked_witnesses = MaskedWitnessGadget::compute(
+        let masked_witnesses = MaskedWitnessVar::compute(
             &witness_voles,
             &masked_voles,
             &verifier_key,
