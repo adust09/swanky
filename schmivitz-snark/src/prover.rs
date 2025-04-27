@@ -7,14 +7,16 @@ use eyre::{Ok, Result};
 use merlin::Transcript;
 use schmivitz::{
     insecure::InsecureVole,
+    parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
     {Proof, RandomVole},
 };
 use std::{fs, path::Path};
+use swanky_field::IsSubFieldOf;
 use swanky_field_binary::{F128b, F64b, F8b};
 use swanky_serialization::CanonicalSerialize as _;
 
 use crate::{
-    constraints::VoleVerification,
+    constraints::{PartialDecommitmentVar, VoleVerification},
     field_mappings::{f128b_to_ark, f64b_to_ark, f8b_to_ark},
     transcript::TranscriptWrapper,
 };
@@ -26,22 +28,64 @@ pub struct VoleProof {
     pub degree_0_commitment: F128b,
     pub degree_1_commitment: F128b,
     pub deccomitment_challenge: F128b,
-    pub partial_decommitment: PartialDecommitment, // ここの実装が現実と異なる。現実ではparamsなどを使っている
+    pub partial_decommitment: PartialDecommitment,
 }
 #[derive(Debug, Clone)]
 pub struct PartialDecommitment {
-    pub verifier_key: F128b,
-    pub witness_voles: Vec<Vec<F8b>>,
-    pub mask_voles: [F128b; 128],
+    /// Number of VOLEs requested.
+    pub extended_witness_length: usize,
+    /// Verifier's chosen random key $`\bf \Delta`$.
+    pub verifier_key: [F8b; REPETITION_PARAM],
+    /// Commitments $`\bf Q`$ to the random values using the specified key and masks.
+    pub verifier_commitments: Vec<[F8b; 16]>,
 }
 
 impl PartialDecommitment {
-    pub fn verifier_key(&self) -> F128b {
+    /// Validate that the partial decommitment is correctly formed.
+    pub fn validate_commitments(&self) -> Result<()> {
+        let expected_num_commitments =
+            self.extended_witness_length + REPETITION_PARAM * VOLE_SIZE_PARAM;
+        if self.verifier_commitments.len() != expected_num_commitments {
+            return Err(eyre::eyre!(
+                "Invalid partial vole decommit: expected {} commitments, got {}",
+                expected_num_commitments,
+                self.verifier_commitments.len()
+            ));
+        }
+
+        Ok(())
+    }
+    /// Get the length of the extended witness (e.g. the number of VOLEs requested).
+    pub fn extended_witness_length(&self) -> usize {
+        self.extended_witness_length
+    }
+
+    /// Get the verifier key.
+    pub fn verifier_key_array(&self) -> [F8b; REPETITION_PARAM] {
         self.verifier_key
     }
 
-    pub fn witness_voles(&self) -> &[Vec<F8b>] {
-        &self.witness_voles
+    pub fn verifier_key(&self) -> F128b {
+        F8b::form_superfield(&self.verifier_key.into())
+    }
+    /// Get the VOLEs corresponding to the witness ($`\bf Q_{[1..\ell]}`$ in the paper).
+    ///
+    /// The output is guaranteed to be [`Self::extended_witness_length()`].
+    pub fn witness_voles(&self) -> &[[F8b; REPETITION_PARAM]] {
+        &self.verifier_commitments[0..self.extended_witness_length]
+    }
+    /// Get the lifted VOLEs corresponding to the mask for the aggregate commitment
+    /// ($`q_{\ell+1}, \dots, q_{\ell + r\tau}`$ in the paper).
+    pub fn mask_voles(&self) -> [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] {
+        // Lift the commitments -- we only want the last $`r\tau`$ of them, so we skip the first ones.
+        // This will panic if we constructed the type with the wrong length.
+        self.verifier_commitments
+            .iter()
+            .skip(self.extended_witness_length)
+            .map(|q| -> F128b { F8b::form_superfield(q.into()) })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap()
     }
 }
 
@@ -72,13 +116,13 @@ fn convert_decommitment(
     decommitment: &<InsecureVole as RandomVole>::Decommitment,
 ) -> Result<PartialDecommitment> {
     let partial_decommitment = PartialDecommitment {
-        verifier_key: decommitment.verifier_key(),
-        witness_voles: decommitment
+        extended_witness_length: decommitment.extended_witness_length(),
+        verifier_key: *decommitment.verifier_key_array(),
+        verifier_commitments: decommitment
             .witness_voles()
             .iter()
-            .map(|vole| vole.to_vec())
+            .map(|vole| vole.clone())
             .collect(),
-        mask_voles: decommitment.mask_voles(),
     };
     Ok(partial_decommitment)
 }
@@ -92,10 +136,9 @@ pub fn setup<R: Rng + CryptoRng>(rng: &mut R) -> Result<SnarkKeys> {
     let dummy_circuit = VoleVerification {
         degree_1_commitment: Bn254Fr::from(0),
         degree_0_commitment: Bn254Fr::from(0),
-        verifier_key: Bn254Fr::from(0),
         witness_commitment: Vec::new(),
-        partial_decommitment: Vec::new(),
         witness_challenges: Vec::new(),
+        partial_decommitment: todo!(),
     };
 
     let (proving_key, verification_key) =
@@ -145,24 +188,35 @@ pub fn prove<R: Rng + CryptoRng>(
         f128b_to_ark(&vole_proof.degree_0_commitment),
         f128b_to_ark(&vole_proof.degree_1_commitment),
     );
+    // PartialDecommitmentVarの出力形式を確認する
+    // var形式にコンバートする
     let circuit = VoleVerification {
         // Public Inputs
         degree_0_commitment: f128b_to_ark(&vole_proof.degree_0_commitment),
         degree_1_commitment: f128b_to_ark(&vole_proof.degree_1_commitment),
-        verifier_key: f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
+
         // Private Inputs
         witness_commitment: vole_proof
             .witness_commitment
             .iter()
             .map(f64b_to_ark)
             .collect(),
-        partial_decommitment: vole_proof
-            .partial_decommitment
-            .witness_voles()
-            .iter()
-            .flat_map(|arr| arr.iter().map(f8b_to_ark))
-            .collect(),
         witness_challenges,
+        partial_decommitment: PartialDecommitmentVar {
+            verifier_key: f128b_to_ark(&vole_proof.partial_decommitment.verifier_key()),
+            mask_voles: vole_proof
+                .partial_decommitment
+                .mask_voles()
+                .iter()
+                .map(|arg0: &F128b| f128b_to_ark(arg0))
+                .collect(),
+            witness_voles: vole_proof
+                .partial_decommitment
+                .witness_voles()
+                .iter()
+                .map(|vole| f8b_to_ark(&vole[0]))
+                .collect(),
+        },
     };
 
     // Error: unsatisfiable constraint system
@@ -239,25 +293,22 @@ mod tests {
     #[test]
     fn test_partial_decommitment_accessors() {
         // Test the accessor methods of PartialDecommitment
-        let verifier_key = F128b::ONE;
-        let witness_voles = vec![vec![F8b::ZERO, F8b::ONE]];
-        let mask_voles = [F128b::ZERO; 128];
+        let verifier_key = [F8b::ONE; 16];
 
         let decommitment = PartialDecommitment {
+            extended_witness_length: 1,
             verifier_key,
-            witness_voles: witness_voles.clone(),
-            mask_voles,
+            verifier_commitments: vec![[F8b::ZERO; 16]],
         };
 
-        // Test verifier_key accessor
-        assert_eq!(decommitment.verifier_key(), verifier_key);
+        // Convert the array to F128b by combining all 16 elements
+        let f128b_key = F8b::form_superfield(&verifier_key.into());
 
-        // Test witness_voles accessor
-        let returned_voles = decommitment.witness_voles();
-        assert_eq!(returned_voles.len(), witness_voles.len());
-        assert_eq!(returned_voles[0].len(), witness_voles[0].len());
-        assert_eq!(returned_voles[0][0], witness_voles[0][0]);
-        assert_eq!(returned_voles[0][1], witness_voles[0][1]);
+        // Convert F128b to Bn254Fr (arkworks field element)
+        f128b_to_ark(&f128b_key);
+
+        // Test verifier_key accessor
+        assert_eq!(decommitment.verifier_key(), f128b_key);
     }
 
     #[test]
@@ -284,9 +335,9 @@ mod tests {
             degree_1_commitment: F128b::ONE,
             deccomitment_challenge: F128b::ONE,
             partial_decommitment: PartialDecommitment {
-                verifier_key: F128b::ONE,
-                witness_voles: vec![vec![F8b::ONE]],
-                mask_voles: [F128b::ZERO; 128],
+                extended_witness_length: 1,
+                verifier_key: [F8b::ONE; 16],
+                verifier_commitments: vec![[F8b::ONE; 16]],
             },
         };
 

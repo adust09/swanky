@@ -15,7 +15,7 @@ pub use gadgets::{
     CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessGadget, WireId, WireRange,
 };
 
-pub use constraints::VoleVerification;
+pub use constraints::{PartialDecommitmentVar, VoleVerification};
 pub use transcript::TranscriptWrapper;
 
 // Re-export field conversion functions
