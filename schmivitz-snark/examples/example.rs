@@ -10,6 +10,7 @@ use schmivitz_snark::{
     f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar, TranscriptWrapper,
     VoleVerification,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -50,6 +51,7 @@ fn main() -> Result<()> {
         &mut transcript,
         rng,
     )?;
+
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     assert!(schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
@@ -91,49 +93,54 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
+fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     let mut transcript = Transcript::new(b"schmivitz-snark");
     let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
 
     transcript_wrapper.append_public_values();
 
-    let witness_commitment_ark: Vec<Bn254Fr> = vole_proof
-        .witness_commitment
-        .iter()
-        .map(f64b_to_ark)
-        .collect();
-    transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
+    // let witness_commitment_ark: Vec<Bn254Fr> = schmivitz_proof
+    //     .witness_commitment
+    //     .iter()
+    //     .map(f64b_to_ark)
+    //     .collect();
+    // transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
 
     // Extract witness challenges from the transcript
     // This ensures challenges are derived deterministically from the transcript
-    let witness_challenges =
-        transcript_wrapper.extract_witness_challenges(vole_proof.witness_challenges.len());
+    let expected_witness_challenges =
+        transcript_wrapper.extract_witness_challenges(schmivitz_proof.witness_challenges.len());
+
+    // println!(
+    //     "witness_challenges.len: {:?} \n",
+    //     expected_witness_challenges.len()
+    // );
 
     // Append polynomial commitments to continue the transcript
-    transcript_wrapper.append_polynomial_commitments(
-        f128b_to_ark(&vole_proof.degree_0_commitment),
-        f128b_to_ark(&vole_proof.degree_1_commitment),
-    );
+    // transcript_wrapper.append_polynomial_commitments(
+    //     f128b_to_ark(&schmivitz_proof.degree_0_commitment),
+    //     f128b_to_ark(&schmivitz_proof.degree_1_commitment),
+    // );
     // convert vole to arkworks variants
     VoleVerification {
         // vole_challenge(missed but only used in outside of verification logic)
         witness_commitment: Some(
-            vole_proof
+            schmivitz_proof
                 .witness_commitment
                 .iter()
                 .map(f64b_to_ark)
                 .collect(),
         ),
-        witness_challenges: Some(witness_challenges),
-        degree_0_commitment: Some(f128b_to_ark(&vole_proof.degree_0_commitment)),
-        degree_1_commitment: Some(f128b_to_ark(&vole_proof.degree_1_commitment)),
+        witness_challenges: Some(expected_witness_challenges),
+        degree_0_commitment: Some(f128b_to_ark(&schmivitz_proof.degree_0_commitment)),
+        degree_1_commitment: Some(f128b_to_ark(&schmivitz_proof.degree_1_commitment)),
         // decommitment_challenge(missed but only used in outside of verification logic)
         partial_decommitment: PartialDecommitmentVar {
             verifier_key: Some(f128b_to_ark(
-                &vole_proof.partial_decommitment.verifier_key(),
+                &schmivitz_proof.partial_decommitment.verifier_key(),
             )),
             mask_voles: Some(
-                vole_proof
+                schmivitz_proof
                     .partial_decommitment
                     .mask_voles()
                     .iter()
@@ -141,7 +148,7 @@ fn build_circuit(vole_proof: Proof<InsecureVole>) -> VoleVerification {
                     .collect(),
             ),
             witness_voles: Some(
-                vole_proof
+                schmivitz_proof
                     .partial_decommitment
                     .witness_voles()
                     .iter()

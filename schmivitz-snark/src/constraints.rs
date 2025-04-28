@@ -2,7 +2,7 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{CircuitTraversalGadget, ConstraintVerificationGadget, MaskedWitnessVar};
+use crate::gadgets::{CircuitTraverser, ConstraintVerificationGadget, MaskedWitnessVar};
 
 #[derive(Debug, Clone)]
 pub struct VoleVerification {
@@ -56,9 +56,8 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &witness_voles_var,
         )?;
 
-        // verifier_key_varは繰り返し使われている
-        let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges_var,
+        let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
+            &witness_challenges_var, // challengesに名を変え、into_partで使われる
             &masked_witnesses_var,
         )?;
 

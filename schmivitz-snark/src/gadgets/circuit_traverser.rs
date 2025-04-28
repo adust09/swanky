@@ -14,12 +14,12 @@ pub struct WireRange {
     pub end: WireId,
 }
 
-/// CircuitTraversalGadget is responsible for traversing the circuit structure
+/// CircuitTraverser is responsible for traversing the circuit structure
 /// and computing the validation aggregate based on witness challenges and masked witnesses.
 ///
 /// This gadget implements a similar functionality to the VerifierTraverser in the original
 /// schmivitz implementation, but adapted for use with R1CS constraints.
-pub struct CircuitTraversalGadget {
+pub struct CircuitTraverser {
     /// Fiat-Shamir challenges. There should be one for each polynomial (non-linear gate).
     challenges: Vec<FpVar<Bn254Fr>>,
 
@@ -42,8 +42,8 @@ pub struct CircuitTraversalGadget {
     aggregate: FpVar<Bn254Fr>,
 }
 
-impl CircuitTraversalGadget {
-    /// Creates a new CircuitTraversalGadget instance.
+impl CircuitTraverser {
+    /// Creates a new CircuitTraverser instance.
     ///
     /// # Arguments
     ///
@@ -54,7 +54,7 @@ impl CircuitTraversalGadget {
     ///
     /// # Returns
     ///
-    /// * Result containing the CircuitTraversalGadget or a synthesis error
+    /// * Result containing the CircuitTraverser or a synthesis error
     pub fn new(
         challenges: Vec<FpVar<Bn254Fr>>,
         verifier_key: FpVar<Bn254Fr>,
@@ -257,15 +257,15 @@ impl CircuitTraversalGadget {
     /// # Returns
     ///
     /// * Result containing the validation aggregate or a synthesis error
-    #[tracing::instrument(target = "r1cs", skip(witness_challenge, masked_witnesses))]
+    #[tracing::instrument(target = "r1cs", skip(witness_challenges, masked_witnesses))]
     pub fn compute_validation_aggregate(
-        witness_challenge: &[FpVar<Bn254Fr>],
+        witness_challenges: &[FpVar<Bn254Fr>],
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
         // Ensure we have the same number of challenges as masked witnesses
         // witness_challenge = []なので制約を満たさない
-        if witness_challenge.len() != masked_witnesses.len() {
-            println!("witness_challenge.len(): {} \n", witness_challenge.len());
+        if witness_challenges.len() != masked_witnesses.len() {
+            println!("witness_challenge.len(): {} \n", witness_challenges.len());
             println!("masked_witnesses.len(): {} \n", masked_witnesses.len());
 
             return Err(SynthesisError::Unsatisfiable);
@@ -277,7 +277,7 @@ impl CircuitTraversalGadget {
         // Traverse the circuit structure and compute the validation aggregate
         // The validation aggregate is computed as the sum of (challenge * masked_witness)
         // for each wire in the circuit
-        for (challenge, masked_witness) in witness_challenge.iter().zip(masked_witnesses.iter()) {
+        for (challenge, masked_witness) in witness_challenges.iter().zip(masked_witnesses.iter()) {
             // Compute challenge * masked_witness
             let term = challenge.mul(masked_witness);
 
@@ -317,11 +317,9 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 1*10 + 2*20 + 3*30 = 10 + 40 + 90 = 140
         let expected = Fr::from(140u64);
@@ -348,11 +346,9 @@ mod tests {
             create_fp_var(cs.clone(), 30), // For wire 3 (multiplication output)
         ];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         let expected = Fr::from(100u64);
 
@@ -378,11 +374,9 @@ mod tests {
             create_fp_var(cs.clone(), 40),
         ];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 1*10 + 0*20 + 1*30 + 0*40 = 10 + 0 + 30 + 0 = 40
         let expected = Fr::from(40u64);
@@ -409,11 +403,9 @@ mod tests {
             create_fp_var(cs.clone(), 5),
         ];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 1*5 + 2*5 + 3*5 + 4*5 = 5 + 10 + 15 + 20 = 50
         let expected = Fr::from(50u64);
@@ -438,11 +430,9 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 0*10 + 0*20 + 0*30 = 0
         let expected = Fr::from(0u64);
@@ -467,11 +457,9 @@ mod tests {
 
         let masked_witnesses = vec![masked_witness1, masked_witness2];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 1*large_value + 1*large_value = 2*large_value
         let expected = large_value + large_value;
@@ -487,11 +475,9 @@ mod tests {
         let witness_challenges: Vec<FpVar<Fr>> = vec![];
         let masked_witnesses: Vec<FpVar<Fr>> = vec![];
 
-        let validation_aggregate = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let validation_aggregate =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         // Expected result: 0 (empty sum)
         let expected = Fr::from(0u64);
@@ -512,10 +498,8 @@ mod tests {
             create_fp_var(cs.clone(), 30), // One more than challenges
         ];
 
-        let result = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        );
+        let result =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses);
 
         assert!(result.is_err());
 
@@ -542,11 +526,9 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
 
-        let _ = CircuitTraversalGadget::compute_validation_aggregate(
-            &witness_challenges,
-            &masked_witnesses,
-        )
-        .unwrap();
+        let _ =
+            CircuitTraverser::compute_validation_aggregate(&witness_challenges, &masked_witnesses)
+                .unwrap();
 
         assert!(cs.is_satisfied().unwrap());
     }
