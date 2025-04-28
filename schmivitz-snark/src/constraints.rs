@@ -55,7 +55,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &verifier_key_var,
             &witness_voles_var,
         )?;
-
+        // ここで死ぬ
         let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
             &witness_challenges_var, // challengesに名を変え、into_partで使われる
             &masked_witnesses_var,

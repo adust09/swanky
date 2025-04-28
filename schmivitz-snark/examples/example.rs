@@ -1,16 +1,15 @@
-use ark_bn254::{Bn254, Fr as Bn254Fr};
+use ark_bn254::Bn254;
 use ark_groth16::Groth16;
 use ark_snark::SNARK;
 use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
-use schmivitz::{insecure::InsecureVole, Proof};
+use schmivitz::{insecure::InsecureVole, to_serializable_proof, Proof};
 use schmivitz_snark::{
     f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar, TranscriptWrapper,
     VoleVerification,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -21,20 +20,32 @@ use tempfile::tempdir;
 
 fn main() -> Result<()> {
     // target circuit
-    let circuit_bytes = "version 2.0.0;
+    let circuit_str = "version 2.0.0;
         circuit;
         @type field 2;
         @begin
-            $0 ... $1 <- @private(0);
-            $2 <- @add(0: $0, $1);
-        @end";
-    let circuit = Cursor::new(circuit_bytes.as_bytes());
+            $0 ... $4 <- @private(0);
+            $5 <- @add(0: $0, $0);
+            $6 <- @add(0: $0, $1);
+            $7 <- @add(0: $0, $2);
+            $8 <- @add(0: $0, $3);
+            $9 <- @add(0: $0, $4);
+            $10 <- @mul(0: $0, $5);
+            $11 <- @mul(0: $0, $6);
+            $12 <- @mul(0: $0, $7);
+            $13 <- @mul(0: $0, $8);
+            $14 <- @mul(0: $0, $9);
+        @end ";
+    let circuit = Cursor::new(circuit_str.as_bytes());
 
     let private_input_bytes = "version 2.0.0;
         private_input;
         @type field 2;
         @begin
             < 1 >;
+            < 1 >;
+            < 1 >;
+            < 0 >;
             < 0 >;
         @end";
 
@@ -51,6 +62,12 @@ fn main() -> Result<()> {
         &mut transcript,
         rng,
     )?;
+
+    // Serialize and save the schmivitz_proof to a JSON file
+    let serializable_proof = to_serializable_proof(&schmivitz_proof);
+    let proof_json = serde_json::to_string_pretty(&serializable_proof)?;
+    fs::write("schmivitz_proof.json", proof_json)?;
+    println!("Saved proof to schmivitz_proof.json");
 
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     assert!(schmivitz_proof
