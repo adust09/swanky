@@ -2,7 +2,7 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 
-use crate::gadgets::{CircuitTraverser, ConstraintVerificationGadget, MaskedWitnessVar};
+use crate::gadgets::{CircuitTraverser, MaskedWitnessVar};
 
 #[derive(Debug, Clone)]
 pub struct VoleVerification {
@@ -55,7 +55,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &verifier_key_var,
             &witness_voles_var,
         )?;
-        // ここで死ぬ
         let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
             &witness_challenges_var, // challengesに名を変え、into_partで使われる
             &masked_witnesses_var,
@@ -71,14 +70,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                 self.degree_1_commitment
                     .ok_or(SynthesisError::AssignmentMissing)
             })?;
-
-        ConstraintVerificationGadget::verify(
-            &degree_0_commitment_var,
-            &degree_1_commitment_var,
-            &verifier_key_var,
-            &validation_aggregate_var,
-        )?
-        .enforce_equal(&Boolean::TRUE)
+        let actual_validation_var =
+            degree_1_commitment_var.clone() * verifier_key_var + degree_0_commitment_var;
+        validation_aggregate_var.enforce_equal(&actual_validation_var)
     }
 }
 
