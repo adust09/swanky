@@ -86,7 +86,7 @@ mod tests {
             create_fp_var(cs.clone(), 2),
             create_fp_var(cs.clone(), 3),
         ];
-        let masked_voles = vec![
+        let witness_voles = vec![
             create_fp_var(cs.clone(), 10),
             create_fp_var(cs.clone(), 20),
             create_fp_var(cs.clone(), 30),
@@ -95,7 +95,7 @@ mod tests {
         let verifier_key = create_fp_var(cs.clone(), 5);
 
         let masked_witnesses =
-            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &masked_voles).unwrap();
+            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
         // Verify results
         assert_eq!(masked_witnesses.len(), 3);
@@ -155,6 +155,7 @@ mod tests {
         let masked_witnesses =
             MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
+        // passed
         assert!(cs.is_satisfied().unwrap());
 
         // Verify the computed values

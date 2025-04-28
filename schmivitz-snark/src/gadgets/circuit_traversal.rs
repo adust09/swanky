@@ -263,7 +263,11 @@ impl CircuitTraversalGadget {
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
         // Ensure we have the same number of challenges as masked witnesses
+        // witness_challenge = []なので制約を満たさない
         if witness_challenge.len() != masked_witnesses.len() {
+            println!("witness_challenge.len(): {} \n", witness_challenge.len());
+            println!("masked_witnesses.len(): {} \n", masked_witnesses.len());
+
             return Err(SynthesisError::Unsatisfiable);
         }
 
@@ -522,6 +526,7 @@ mod tests {
     }
 
     #[test]
+    // passed
     fn test_constraint_satisfaction() {
         let cs = ConstraintSystem::<Fr>::new_ref();
 

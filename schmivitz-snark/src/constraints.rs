@@ -15,7 +15,6 @@ pub struct VoleVerification {
     pub partial_decommitment: PartialDecommitmentVar,
 }
 #[derive(Debug, Clone)]
-
 pub struct PartialDecommitmentVar {
     pub verifier_key: Option<Bn254Fr>,
     pub mask_voles: Option<Vec<Bn254Fr>>,
@@ -57,7 +56,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &witness_voles_var,
         )?;
 
-        // witness_challenges_varとverifier_key_varは繰り返し使われている
+        // verifier_key_varは繰り返し使われている
         let validation_aggregate_var = CircuitTraversalGadget::compute_validation_aggregate(
             &witness_challenges_var,
             &masked_witnesses_var,

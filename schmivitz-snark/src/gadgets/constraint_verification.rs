@@ -70,7 +70,9 @@ mod tests {
         )
         .unwrap();
 
+        // failed this
         assert!(result.value().unwrap());
+        // passed below
         assert!(cs.is_satisfied().unwrap());
     }
 
