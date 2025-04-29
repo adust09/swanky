@@ -145,6 +145,7 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     //     f128b_to_ark(&schmivitz_proof.degree_0_commitment),
     //     f128b_to_ark(&schmivitz_proof.degree_1_commitment),
     // );
+
     // convert vole to arkworks variants
     VoleVerification {
         // vole_challenge(missed but only used in outside of verification logic)

@@ -1,45 +1,50 @@
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::r1cs::SynthesisError;
+use schmivitz::parameters::REPETITION_PARAM;
 
 pub struct MaskedWitnessVar;
 
 impl MaskedWitnessVar {
     // L236~
-    #[tracing::instrument(target = "r1cs", skip(witness_commitment, verifier_key, witness_voles))]
+    #[tracing::instrument(
+        target = "r1cs",
+        skip(witness_commitment_var, verifier_key_var, witness_voles_var)
+    )]
     pub fn compute(
-        witness_commitment: &Vec<FpVar<Bn254Fr>>,
-        verifier_key: &FpVar<Bn254Fr>,
-        witness_voles: &[FpVar<Bn254Fr>],
+        witness_commitment_var: &Vec<FpVar<Bn254Fr>>,
+        verifier_key_var: &FpVar<Bn254Fr>,
+        witness_voles_var: &[FpVar<Bn254Fr>],
     ) -> Result<Vec<FpVar<Bn254Fr>>, SynthesisError> {
         // Based on the test cases and the original code in proof.rs, we need to:
         // 1. Calculate d_delta by multiplying each witness commitment with the verifier key
-        // 2. Add d_delta to the witness_voles to get the masked witnesses
+        // 2. Add d_delta to the witness_voles_var to get the masked witnesses
 
         // Calculate d_delta (corresponds to lines 236-257 in proof.rs)
         // Multiply each witness commitment with the verifier key
-        let d_delta: Vec<FpVar<Bn254Fr>> = witness_commitment
+        // fix: type
+        let d_delta: Vec<FpVar<Bn254Fr>> = witness_commitment_var
             .iter()
             .map(|witness_com| {
                 // In the original code, there's a conversion from F64b to F8b
                 // Here we're working with FpVar<Bn254Fr>, so we'll directly multiply
                 // the witness commitment with the verifier key
-                witness_com.clone() * verifier_key.clone()
+                witness_com.clone() * verifier_key_var.clone()
             })
             .collect::<Vec<_>>();
         // length違うのが原因？-> witness_voleの問題
 
-        // proof.rsのこのパートにはwitness_commitment
-        // Handle the case where witness_voles and witness_commitment have different lengths
+        // proof.rsのこのパートにはwitness_commitment_var
+        // Handle the case where witness_voles_var and witness_commitment_var have different lengths
         // This ensures we don't silently ignore elements if the arrays have different lengths
-        if witness_voles.len() != witness_commitment.len() {
+        if witness_voles_var.len() != witness_commitment_var.len() {
             // We could return an error, but for now let's just use the minimum length
             // to avoid panicking, similar to how zip behaves
-            let min_len = std::cmp::min(witness_voles.len(), witness_commitment.len());
+            let min_len = std::cmp::min(witness_voles_var.len(), witness_commitment_var.len());
 
             let mut masked_witnesses = Vec::with_capacity(min_len);
             for i in 0..min_len {
-                let masked_witness = witness_voles[i].clone() + d_delta[i].clone();
+                let masked_witness = witness_voles_var[i].clone() + d_delta[i].clone();
                 masked_witnesses.push(masked_witness);
             }
 
@@ -48,7 +53,7 @@ impl MaskedWitnessVar {
 
         // Calculate masked witnesses (corresponds to lines 258-268 in proof.rs)
         // In the original code: masked_witness = witness_vole + d_delta
-        let masked_witnesses: Vec<FpVar<Bn254Fr>> = witness_voles
+        let masked_witnesses: Vec<FpVar<Bn254Fr>> = witness_voles_var
             .iter()
             .zip(d_delta.iter())
             .map(|(witness_vole, d_delta_element)| {
@@ -84,7 +89,7 @@ mod tests {
     fn test_basic_computation() {
         let cs = create_cs();
 
-        let witness_commitment = vec![
+        let witness_commitment_var = vec![
             create_fp_var(cs.clone(), 1),
             create_fp_var(cs.clone(), 2),
             create_fp_var(cs.clone(), 3),
@@ -95,10 +100,11 @@ mod tests {
             create_fp_var(cs.clone(), 30),
         ];
 
-        let verifier_key = create_fp_var(cs.clone(), 5);
+        let verifier_key_var = create_fp_var(cs.clone(), 5);
 
         let masked_witnesses =
-            MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
+            MaskedWitnessVar::compute(&witness_commitment_var, &verifier_key_var, &witness_voles)
+                .unwrap();
 
         // Verify results
         assert_eq!(masked_witnesses.len(), 3);

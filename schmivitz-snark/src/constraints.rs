@@ -19,7 +19,7 @@ pub struct VoleVerification {
 pub struct PartialDecommitmentVar {
     pub verifier_key: Option<Bn254Fr>,
     pub witness_voles: Option<Vec<[Bn254Fr; REPETITION_PARAM]>>,
-    pub mask_voles: Option<[Bn254Fr; REPETITION_PARAM * VOLE_SIZE_PARAM]>,
+    pub mask_voles: Option<[Bn254Fr; REPETITION_PARAM * VOLE_SIZE_PARAM]>, // todo: use in combine
 }
 
 impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
@@ -52,7 +52,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .as_ref()
                     .ok_or(SynthesisError::AssignmentMissing)
                     .map(|voles| {
-                        // Flatten the Vec<[Bn254Fr; REPETITION_PARAM]> into Vec<Bn254Fr>
                         voles
                             .iter()
                             .flat_map(|arr| arr.iter())
