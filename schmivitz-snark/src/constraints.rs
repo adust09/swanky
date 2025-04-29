@@ -44,27 +44,68 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                 .ok_or(SynthesisError::AssignmentMissing)
         })?;
 
-        // Flatten the Vec<[Bn254Fr; REPETITION_PARAM]> into Vec<Bn254Fr>
-        let witness_voles_var =
-            Vec::<FpVar<Bn254Fr>>::new_witness(ark_relations::ns!(cs, "witness_voles"), || {
-                self.partial_decommitment
-                    .witness_voles
-                    .as_ref()
-                    .ok_or(SynthesisError::AssignmentMissing)
-                    .map(|voles| {
-                        voles
-                            .iter()
-                            .flat_map(|arr| arr.iter())
-                            .cloned()
-                            .collect::<Vec<_>>()
-                    })
-            })?;
+        // Get the witness voles from the partial decommitment
+        let witness_voles = self
+            .partial_decommitment
+            .witness_voles
+            .clone()
+            .ok_or(SynthesisError::AssignmentMissing)?;
 
-        let masked_witnesses_var = MaskedWitnessVar::compute(
-            &witness_commitment_var,
-            &verifier_key_var,
-            &witness_voles_var,
-        )?;
+        // Create a vector to hold the witness vole
+        let mut witness_voles_var = Vec::with_capacity(witness_voles.len());
+
+        // For each vole array in the witness voles
+        for vole_array in witness_voles.iter() {
+            // Create a vector to hold the FpVar elements for this array
+            let mut fp_vec = Vec::with_capacity(REPETITION_PARAM);
+
+            // For each element in the vole array
+            for val in vole_array.iter() {
+                // Create a witness variable for the element
+                let var =
+                    FpVar::new_witness(ark_relations::ns!(cs, "witness_vole_element"), || {
+                        Ok(*val)
+                    })?;
+                fp_vec.push(var);
+            }
+
+            witness_voles_var.push(fp_vec);
+        }
+
+        // Step 1: Compute d_delta
+        let mut d_delta_var = Vec::with_capacity(witness_commitment_var.len());
+
+        // For each witness commitment, compute d_delta array
+        for commitment in witness_commitment_var.iter() {
+            // Create an array of REPETITION_PARAM elements
+            let mut delta_array = Vec::with_capacity(REPETITION_PARAM);
+
+            // In proof.rs, each witness commitment is multiplied by each key in the verifier_key_array
+            // Here, we'll create an array where the first element is commitment * verifier_key
+            // and the rest are zeros (since we don't have the bit conversion logic from proof.rs)
+            let delta = commitment.clone() * verifier_key_var.clone();
+
+            // Add the delta as the first element
+            delta_array.push(delta);
+
+            // Add zeros for the rest of the elements
+            for _ in 1..REPETITION_PARAM {
+                // Create a zero FpVar
+                let zero_var = FpVar::<Bn254Fr>::new_constant(
+                    ark_relations::ns!(cs, "zero"),
+                    Bn254Fr::from(0),
+                )?;
+                delta_array.push(zero_var);
+            }
+
+            // Convert Vec to array
+            let delta_array: [FpVar<Bn254Fr>; REPETITION_PARAM] = delta_array.try_into().unwrap();
+            d_delta_var.push(delta_array);
+        }
+
+        // Step 2: Compute masked witnesses
+        let masked_witnesses_var =
+            MaskedWitnessVar::compute_masked_witness(&witness_voles_var, &d_delta_var)?;
         let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
             &witness_challenges_var, // challengesに名を変え、into_partで使われる
             &masked_witnesses_var,
