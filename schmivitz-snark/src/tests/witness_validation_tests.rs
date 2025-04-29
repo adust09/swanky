@@ -6,6 +6,7 @@ mod tests {
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
     use ark_std::One;
     use ark_std::Zero;
+    use schmivitz::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
     /// Helper function to create a test circuit with default values
     fn create_test_circuit() -> VoleVerification {
@@ -19,8 +20,18 @@ mod tests {
             witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)].into(),
             partial_decommitment: PartialDecommitmentVar {
                 verifier_key: Some(Bn254Fr::from(3u64)),
-                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
-                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
+                mask_voles: {
+                    let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+                    array[0] = Bn254Fr::from(6u64);
+                    array[1] = Bn254Fr::from(7u64);
+                    Some(array)
+                },
+                witness_voles: {
+                    let mut arr = [Bn254Fr::default(); REPETITION_PARAM];
+                    arr[0] = Bn254Fr::from(10u64);
+                    arr[1] = Bn254Fr::from(11u64);
+                    vec![arr].into()
+                },
             },
         }
     }
@@ -41,18 +52,22 @@ mod tests {
             vec![Bn254Fr::zero(), Bn254Fr::one(), Bn254Fr::from(u64::MAX)].into();
 
         // Adjust other vectors to match the size
-        circuit.partial_decommitment.mask_voles = vec![
-            Bn254Fr::from(10u64),
-            Bn254Fr::from(11u64),
-            Bn254Fr::from(12u64),
-        ]
-        .into();
-        circuit.partial_decommitment.witness_voles = vec![
-            Bn254Fr::from(13u64),
-            Bn254Fr::from(14u64),
-            Bn254Fr::from(15u64),
-        ]
-        .into();
+        circuit.partial_decommitment.mask_voles = {
+            let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+            array[0] = Bn254Fr::from(10u64);
+            array[1] = Bn254Fr::from(11u64);
+            array[2] = Bn254Fr::from(12u64);
+            Some(array)
+        };
+        circuit.partial_decommitment.witness_voles = {
+            let mut arr1 = [Bn254Fr::default(); REPETITION_PARAM];
+            arr1[0] = Bn254Fr::from(13u64);
+            let mut arr2 = [Bn254Fr::default(); REPETITION_PARAM];
+            arr2[0] = Bn254Fr::from(14u64);
+            let mut arr3 = [Bn254Fr::default(); REPETITION_PARAM];
+            arr3[0] = Bn254Fr::from(15u64);
+            vec![arr1, arr2, arr3].into()
+        };
 
         circuit.witness_challenges = vec![
             Bn254Fr::from(16u64),
@@ -152,9 +167,18 @@ mod tests {
 
         // Set witness vectors to different sizes
         circuit.witness_commitment = vec![Bn254Fr::from(4u64), Bn254Fr::from(5u64)].into();
-        circuit.partial_decommitment.mask_voles = vec![Bn254Fr::from(6u64)].into(); // One element short
-        circuit.partial_decommitment.witness_voles =
-            vec![Bn254Fr::from(7u64), Bn254Fr::from(8u64)].into();
+        circuit.partial_decommitment.mask_voles = {
+            let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+            array[0] = Bn254Fr::from(6u64);
+            Some(array)
+        }; // One element short
+        circuit.partial_decommitment.witness_voles = {
+            let mut arr1 = [Bn254Fr::default(); REPETITION_PARAM];
+            arr1[0] = Bn254Fr::from(7u64);
+            let mut arr2 = [Bn254Fr::default(); REPETITION_PARAM];
+            arr2[0] = Bn254Fr::from(8u64);
+            vec![arr1, arr2].into()
+        };
         circuit.witness_challenges = vec![
             Bn254Fr::from(9u64),
             Bn254Fr::from(10u64),

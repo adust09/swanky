@@ -1,6 +1,7 @@
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use schmivitz::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
 use crate::gadgets::{CircuitTraverser, MaskedWitnessVar};
 
@@ -14,12 +15,11 @@ pub struct VoleVerification {
     //decommitment_challenge(missed but only used in outside of verification logic)
     pub partial_decommitment: PartialDecommitmentVar,
 }
-// 型が違うかも
 #[derive(Debug, Clone)]
 pub struct PartialDecommitmentVar {
     pub verifier_key: Option<Bn254Fr>,
-    pub mask_voles: Option<Vec<Bn254Fr>>,
-    pub witness_voles: Option<Vec<Bn254Fr>>,
+    pub witness_voles: Option<Vec<[Bn254Fr; REPETITION_PARAM]>>,
+    pub mask_voles: Option<[Bn254Fr; REPETITION_PARAM * VOLE_SIZE_PARAM]>,
 }
 
 impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
@@ -44,11 +44,21 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                 .ok_or(SynthesisError::AssignmentMissing)
         })?;
 
+        // Flatten the Vec<[Bn254Fr; REPETITION_PARAM]> into Vec<Bn254Fr>
         let witness_voles_var =
             Vec::<FpVar<Bn254Fr>>::new_witness(ark_relations::ns!(cs, "witness_voles"), || {
                 self.partial_decommitment
                     .witness_voles
+                    .as_ref()
                     .ok_or(SynthesisError::AssignmentMissing)
+                    .map(|voles| {
+                        // Flatten the Vec<[Bn254Fr; REPETITION_PARAM]> into Vec<Bn254Fr>
+                        voles
+                            .iter()
+                            .flat_map(|arr| arr.iter())
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    })
             })?;
 
         let masked_witnesses_var = MaskedWitnessVar::compute(
@@ -93,8 +103,18 @@ mod tests {
             degree_1_commitment: Some(Bn254Fr::from(2u64)),
             partial_decommitment: PartialDecommitmentVar {
                 verifier_key: Some(Bn254Fr::from(3u64)),
-                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
-                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
+                witness_voles: {
+                    let mut arr = [Bn254Fr::default(); REPETITION_PARAM];
+                    arr[0] = Bn254Fr::from(10u64);
+                    arr[1] = Bn254Fr::from(11u64);
+                    vec![arr].into()
+                },
+                mask_voles: {
+                    let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+                    array[0] = Bn254Fr::from(6u64);
+                    array[1] = Bn254Fr::from(7u64);
+                    Some(array)
+                },
             },
         }
     }

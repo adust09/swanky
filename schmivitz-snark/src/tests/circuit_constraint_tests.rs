@@ -3,6 +3,7 @@ mod tests {
     use crate::constraints::{PartialDecommitmentVar, VoleVerification};
     use ark_bn254::Fr as Bn254Fr;
     use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef};
+    use schmivitz::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
     /// Helper function to create a test circuit with default values
     fn create_test_circuit() -> VoleVerification {
         VoleVerification {
@@ -15,8 +16,18 @@ mod tests {
             witness_challenges: vec![Bn254Fr::from(8u64), Bn254Fr::from(9u64)].into(),
             partial_decommitment: PartialDecommitmentVar {
                 verifier_key: Some(Bn254Fr::from(3u64)),
-                mask_voles: vec![Bn254Fr::from(6u64), Bn254Fr::from(7u64)].into(),
-                witness_voles: vec![Bn254Fr::from(10u64), Bn254Fr::from(11u64)].into(),
+                mask_voles: {
+                    let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+                    array[0] = Bn254Fr::from(6u64);
+                    array[1] = Bn254Fr::from(7u64);
+                    Some(array)
+                },
+                witness_voles: {
+                    let mut arr = [Bn254Fr::default(); REPETITION_PARAM];
+                    arr[0] = Bn254Fr::from(10u64);
+                    arr[1] = Bn254Fr::from(11u64);
+                    vec![arr].into()
+                },
             },
         }
     }

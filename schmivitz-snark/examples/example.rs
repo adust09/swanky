@@ -1,11 +1,17 @@
 use ark_bn254::Bn254;
+use ark_bn254::Fr as Bn254Fr;
+
 use ark_groth16::Groth16;
 use ark_snark::SNARK;
 use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
-use schmivitz::{insecure::InsecureVole, to_serializable_proof, Proof};
+use schmivitz::{
+    insecure::InsecureVole,
+    parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
+    to_serializable_proof, Proof,
+};
 use schmivitz_snark::{
     f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar, TranscriptWrapper,
     VoleVerification,
@@ -70,6 +76,7 @@ fn main() -> Result<()> {
     println!("Saved proof to schmivitz_proof.json");
 
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
+    // validate proof
     assert!(schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .is_ok());
@@ -156,22 +163,39 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
             verifier_key: Some(f128b_to_ark(
                 &schmivitz_proof.partial_decommitment.verifier_key(),
             )),
-            mask_voles: Some(
-                schmivitz_proof
+            mask_voles: Some({
+                // First collect into a Vec
+                let vec: Vec<Bn254Fr> = schmivitz_proof
                     .partial_decommitment
                     .mask_voles()
                     .iter()
                     .map(|arg0: &F128b| f128b_to_ark(arg0))
-                    .collect(),
-            ),
-            witness_voles: Some(
-                schmivitz_proof
-                    .partial_decommitment
-                    .witness_voles()
-                    .iter()
-                    .flat_map(|arr| arr.iter().copied().map(|value: F8b| f8b_to_ark(&value)))
-                    .collect(),
-            ),
+                    .collect();
+
+                // Then convert Vec to array
+                let mut array = [Bn254Fr::default(); REPETITION_PARAM * VOLE_SIZE_PARAM];
+                for (i, val) in vec.into_iter().enumerate() {
+                    if i < REPETITION_PARAM * VOLE_SIZE_PARAM {
+                        array[i] = val;
+                    } else {
+                        break;
+                    }
+                }
+                array
+            }),
+            witness_voles: {
+                let mut result = Vec::new();
+                for arr in schmivitz_proof.partial_decommitment.witness_voles() {
+                    let mut converted_arr = [Bn254Fr::default(); REPETITION_PARAM];
+                    for (i, &value) in arr.iter().enumerate() {
+                        if i < REPETITION_PARAM {
+                            converted_arr[i] = f8b_to_ark(&value);
+                        }
+                    }
+                    result.push(converted_arr);
+                }
+                Some(result)
+            },
         },
     }
 }
