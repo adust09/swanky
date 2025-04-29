@@ -21,7 +21,7 @@ use std::{
     io::{Cursor, Write},
     path::Path,
 };
-use swanky_field_binary::{F128b, F8b};
+use swanky_field_binary::F128b;
 use tempfile::tempdir;
 
 fn main() -> Result<()> {

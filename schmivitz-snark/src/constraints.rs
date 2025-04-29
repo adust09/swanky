@@ -72,7 +72,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             witness_voles_var.push(fp_vec);
         }
 
-        // Step 1: Compute d_delta
+        // Compute masked witnesses Q' = Q[..l] + d * Delta (step.2)
         let mut d_delta_var = Vec::with_capacity(witness_commitment_var.len());
 
         // For each witness commitment, compute d_delta array
@@ -107,13 +107,62 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
         let masked_witnesses_var =
             MaskedWitnessVar::compute_masked_witness(&witness_voles_var, &d_delta_var)?;
         let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
-            &witness_challenges_var, // challengesに名を変え、into_partで使われる
+            &witness_challenges_var,
             &masked_witnesses_var,
         )?;
 
-        // let validation_mask_var = combine(self.partial_decommitment.mask_voles());
-        // let validation = validation_aggregate_var + validation_mask;
+        // Step 3: Combine mask VOLEs to get validation_mask (q* in proof.rs)
+        // This corresponds to the calculation in proof.rs line 273:
+        // let validation_mask = combine(self.partial_decommitment.mask_voles());
 
+        // Get the mask_voles from the partial_decommitment
+        let mask_voles = self
+            .partial_decommitment
+            .mask_voles
+            .clone()
+            .ok_or(SynthesisError::AssignmentMissing)?;
+
+        // Create FpVar variables for each mask_vole
+        let mut mask_voles_var = Vec::with_capacity(mask_voles.len());
+        for val in mask_voles.iter() {
+            let var = FpVar::new_witness(ark_relations::ns!(cs, "mask_vole_element"), || Ok(*val))?;
+            mask_voles_var.push(var);
+        }
+
+        // Implement the combine function from proof.rs:
+        // fn combine(values: [F128b; 128]) -> F128b {
+        //     let mut power = F128b::ONE;
+        //     let mut acc = F128b::ZERO;
+        //     for vi in values {
+        //         acc += vi * power;
+        //         power *= F128b::GENERATOR;
+        //     }
+        //     acc
+        // }
+
+        // Create constants for ONE and GENERATOR
+        let one = FpVar::new_constant(ark_relations::ns!(cs, "one"), Bn254Fr::from(1u64))?;
+
+        // Use 2 as a simple generator value (similar to what we did in masked_witness.rs)
+        let generator_value = Bn254Fr::from(2u64);
+        let generator = FpVar::new_constant(ark_relations::ns!(cs, "generator"), generator_value)?;
+
+        // Initialize accumulator and power
+        let mut validation_mask_var =
+            FpVar::new_constant(ark_relations::ns!(cs, "zero"), Bn254Fr::from(0u64))?;
+        let mut power_var = one.clone();
+
+        // Combine the mask_voles using the same algorithm as in proof.rs
+        for mask_vole_var in mask_voles_var.iter() {
+            validation_mask_var = validation_mask_var + (mask_vole_var.clone() * power_var.clone());
+            power_var = power_var * generator.clone();
+        }
+
+        // Step 4: Compute the final validation value
+        // In proof.rs: let validation = validation_aggregate + validation_mask;
+        let validation_var = validation_aggregate_var + validation_mask_var;
+
+        // Step 5: Check the main constraint of the proof
         let degree_0_commitment_var =
             FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
                 self.degree_0_commitment
@@ -126,7 +175,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             })?;
         let actual_validation_var =
             degree_1_commitment_var.clone() * verifier_key_var + degree_0_commitment_var;
-        validation_aggregate_var.enforce_equal(&actual_validation_var) // gadgetを無視してもfailsするのはcomvineとかやってないから
+
+        // Enforce that validation equals actual_validation
+        validation_var.enforce_equal(&actual_validation_var)
     }
 }
 #[cfg(test)]

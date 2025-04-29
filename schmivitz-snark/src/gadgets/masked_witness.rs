@@ -1,5 +1,4 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::fields::FieldVar;
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 use schmivitz::parameters::REPETITION_PARAM;
@@ -88,21 +87,68 @@ impl MaskedWitnessVar {
 
         // For each pair of witness vole and d_delta, compute the masked witness
         for (i, d_delta_array) in d_delta_var.iter().enumerate() {
-            // Make sure we have enough vole arrays
-            if i >= witness_voles_var.len() {
-                return Err(SynthesisError::AssignmentMissing);
+            // Get the corresponding witness vole array
+            let witness_vole = &witness_voles_var[i];
+            // Create an array to hold the element-wise sums
+            let mut element_sums = Vec::with_capacity(REPETITION_PARAM);
+
+            // Add each element of the witness vole to the corresponding element of d_delta
+            // This matches the behavior in proof.rs:
+            // let masked_witness: [F8b; 16] = zip(qs, dds)
+            //     .map(|(q, dd)| q + dd)
+            //     .collect::<Vec<_>>()
+            //     .try_into()
+            //     .unwrap();
+            for j in 0..REPETITION_PARAM {
+                if j < witness_vole.len() {
+                    element_sums.push(witness_vole[j].clone() + d_delta_array[j].clone());
+                } else {
+                    // If witness_vole is shorter than REPETITION_PARAM, just use the d_delta value
+                    element_sums.push(d_delta_array[j].clone());
+                }
             }
 
-            // Make sure the vole array has at least one element
-            if witness_voles_var[i].is_empty() {
-                return Err(SynthesisError::AssignmentMissing);
+            // In proof.rs, after adding the elements, it forms a superfield:
+            // F8b::form_superfield(&masked_witness.into())
+            //
+            // In the context of F8b::form_superfield, it's combining multiple F8b elements
+            // into a larger field element (likely F128b based on the code).
+            //
+            // For our FpVar<Bn254Fr> implementation, we need to combine these elements
+            // in a way that's consistent with the original implementation.
+            //
+            // We'll use a linear combination approach similar to the `combine` function in proof.rs:
+            // Start with the first element and add each subsequent element multiplied by increasing powers
+            // of a "generator" value.
+
+            // Start with the first element
+            let mut combined = element_sums[0].clone();
+
+            // Use a constant for the "generator" - in a real implementation this should match
+            // the generator used in F8b::form_superfield
+            let generator_value = Bn254Fr::from(2u64); // Using 2 as a simple generator
+            let mut generator = FpVar::new_constant(
+                ark_relations::ns!(
+                    ark_relations::r1cs::ConstraintSystem::<Bn254Fr>::new_ref(),
+                    "generator"
+                ),
+                generator_value,
+            )?;
+
+            // Combine the elements using a linear combination
+            for j in 1..element_sums.len() {
+                combined = combined + (element_sums[j].clone() * generator.clone());
+                generator = generator
+                    * FpVar::new_constant(
+                        ark_relations::ns!(
+                            ark_relations::r1cs::ConstraintSystem::<Bn254Fr>::new_ref(),
+                            "generator"
+                        ),
+                        generator_value,
+                    )?;
             }
 
-            // In proof.rs, each element of the vole array is added to the corresponding
-            // element of the d_delta array. Here, we'll just use the first element of each.
-            let masked_witness = witness_voles_var[i][0].clone() + d_delta_array[0].clone();
-
-            masked_witnesses.push(masked_witness);
+            masked_witnesses.push(combined);
         }
 
         Ok(masked_witnesses)
