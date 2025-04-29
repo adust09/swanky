@@ -17,6 +17,7 @@ impl MaskedWitnessVar {
         // 2. Add d_delta to the witness_voles to get the masked witnesses
 
         // Calculate d_delta (corresponds to lines 236-257 in proof.rs)
+        // Multiply each witness commitment with the verifier key
         let d_delta: Vec<FpVar<Bn254Fr>> = witness_commitment
             .iter()
             .map(|witness_com| {
@@ -25,8 +26,10 @@ impl MaskedWitnessVar {
                 // the witness commitment with the verifier key
                 witness_com.clone() * verifier_key.clone()
             })
-            .collect();
+            .collect::<Vec<_>>();
+        // length違うのが原因？-> witness_voleの問題
 
+        // proof.rsのこのパートにはwitness_commitment
         // Handle the case where witness_voles and witness_commitment have different lengths
         // This ensures we don't silently ignore elements if the arrays have different lengths
         if witness_voles.len() != witness_commitment.len() {

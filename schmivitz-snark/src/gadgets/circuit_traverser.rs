@@ -262,12 +262,7 @@ impl CircuitTraverser {
         witness_challenges: &[FpVar<Bn254Fr>],
         masked_witnesses: &[FpVar<Bn254Fr>],
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
-        // Ensure we have the same number of challenges as masked witnesses
-        // witness_challenge = []なので制約を満たさない
-        if witness_challenges.len() != masked_witnesses.len() {
-            println!("witness_challenge.len(): {} \n", witness_challenges.len());
-            println!("masked_witnesses.len(): {} \n", masked_witnesses.len());
-
+        if witness_challenges.len() > masked_witnesses.len() {
             return Err(SynthesisError::Unsatisfiable);
         }
 

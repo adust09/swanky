@@ -74,7 +74,6 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .is_ok());
 
-    // circuit_specific_setupでpanicが発生するが、rollup.rsとの差分はこのbuildingの部分だけ
     let circuit_defining_cs = build_circuit(schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
@@ -99,6 +98,7 @@ fn main() -> Result<()> {
             .unwrap(),
     ];
 
+    // cs unsatisfied
     let snark_proof = Groth16::prove(&pk, circuit_to_verify_against, &mut rng)?;
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
 
@@ -114,7 +114,7 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     let mut transcript = Transcript::new(b"schmivitz-snark");
     let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
 
-    transcript_wrapper.append_public_values();
+    // transcript_wrapper.append_public_values();
 
     // let witness_commitment_ark: Vec<Bn254Fr> = schmivitz_proof
     //     .witness_commitment

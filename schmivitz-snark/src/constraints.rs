@@ -14,6 +14,7 @@ pub struct VoleVerification {
     //decommitment_challenge(missed but only used in outside of verification logic)
     pub partial_decommitment: PartialDecommitmentVar,
 }
+// 型が違うかも
 #[derive(Debug, Clone)]
 pub struct PartialDecommitmentVar {
     pub verifier_key: Option<Bn254Fr>,
@@ -60,6 +61,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &masked_witnesses_var,
         )?;
 
+        // let validation_mask_var = combine(self.partial_decommitment.mask_voles());
+        // let validation = validation_aggregate_var + validation_mask;
+
         let degree_0_commitment_var =
             FpVar::new_input(ark_relations::ns!(cs, "degree_0_commitment"), || {
                 self.degree_0_commitment
@@ -72,10 +76,9 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             })?;
         let actual_validation_var =
             degree_1_commitment_var.clone() * verifier_key_var + degree_0_commitment_var;
-        validation_aggregate_var.enforce_equal(&actual_validation_var)
+        validation_aggregate_var.enforce_equal(&actual_validation_var) // gadgetを無視してもfailsするのはcomvineとかやってないから
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

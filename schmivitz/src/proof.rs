@@ -256,6 +256,7 @@ impl Proof<InsecureVole> {
                     .map(|key| witness_com_f8b * key)
             })
             .collect::<Vec<_>>();
+
         let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta)
             .map(|(qs, dds)| {
                 // NB: This unwrap is safe because we know the two input arrays are each exactly length 16.
