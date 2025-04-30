@@ -6,6 +6,7 @@ use schmivitz::parameters::REPETITION_PARAM;
 pub struct MaskedWitnessVar;
 
 impl MaskedWitnessVar {
+    /// Step 1: Compute d_delta values based on witness commitment and verifier key
     /// Compute d_delta values based on witness commitment and verifier key
     ///
     /// This corresponds to the calculation in proof.rs lines 237-258:
@@ -61,7 +62,7 @@ impl MaskedWitnessVar {
         Ok(d_delta)
     }
 
-    /// Compute masked witness values based on witness voles and d_delta
+    /// Step 2: Compute masked witness values based on witness voles and d_delta
     ///
     /// This corresponds to the calculation in proof.rs lines 260-270:
     /// ```
@@ -84,6 +85,10 @@ impl MaskedWitnessVar {
     ) -> Result<Vec<FpVar<Bn254Fr>>, SynthesisError> {
         // Initialize the result vector
         let mut masked_witnesses = Vec::with_capacity(d_delta_var.len());
+        print!(
+            "the length of witness_voles_var: {:?} \n",
+            witness_voles_var.len()
+        );
 
         // For each pair of witness vole and d_delta, compute the masked witness
         for (i, d_delta_array) in d_delta_var.iter().enumerate() {
@@ -154,9 +159,56 @@ impl MaskedWitnessVar {
         Ok(masked_witnesses)
     }
 
+    /// Step 3: Compute validation mask from mask voles
+    ///
+    /// This corresponds to the calculation in proof.rs line 273:
+    /// ```
+    /// let validation_mask = combine(self.partial_decommitment.mask_voles());
+    /// ```
+    ///
+    /// Where combine is defined as:
+    /// ```
+    /// fn combine(values: [F128b; 128]) -> F128b {
+    ///     // Start with `X^0 = 1`
+    ///     let mut power = F128b::ONE;
+    ///     let mut acc = F128b::ZERO;
+    ///
+    ///     for vi in values {
+    ///         acc += vi * power;
+    ///         power *= F128b::GENERATOR;
+    ///     }
+    ///     acc
+    /// }
+    /// ```
+    #[tracing::instrument(target = "r1cs", skip(cs, mask_voles_var))]
+    pub fn compute_validation_mask(
+        cs: ConstraintSystemRef<Bn254Fr>,
+        mask_voles_var: &[FpVar<Bn254Fr>],
+    ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
+        // Create constants for ONE and GENERATOR
+        let one = FpVar::new_constant(ark_relations::ns!(cs, "one"), Bn254Fr::from(1u64))?;
+
+        // Use 2 as a simple generator value (similar to what we did in compute_masked_witness)
+        let generator_value = Bn254Fr::from(2u64);
+        let generator = FpVar::new_constant(ark_relations::ns!(cs, "generator"), generator_value)?;
+
+        // Initialize accumulator and power
+        let mut validation_mask_var =
+            FpVar::new_constant(ark_relations::ns!(cs, "zero"), Bn254Fr::from(0u64))?;
+        let mut power_var = one.clone();
+
+        // Combine the mask_voles using the same algorithm as in proof.rs
+        for mask_vole_var in mask_voles_var.iter() {
+            validation_mask_var = validation_mask_var + (mask_vole_var.clone() * power_var.clone());
+            power_var = power_var * generator.clone();
+        }
+
+        Ok(validation_mask_var)
+    }
+
     /// Combined function to compute masked witnesses from witness commitment, verifier key, and witness voles
     ///
-    /// This function combines the two steps:
+    /// This function combines the first two steps:
     /// 1. Compute d_delta from witness commitment and verifier key
     /// 2. Compute masked witnesses from witness voles and d_delta
     #[tracing::instrument(
