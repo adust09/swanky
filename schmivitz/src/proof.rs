@@ -233,6 +233,11 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
 
+        // Q' = masked_witness = 16
+        // Q[..l] = witness_voles = 16
+        // d = witness_com = 10
+        // Delta = key = 16
+
         // Compute masked witnesses Q' = Q[..l] + d * Delta (step.2)
         let d_delta = self
             .witness_commitment

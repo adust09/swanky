@@ -2,6 +2,10 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 use schmivitz::parameters::REPETITION_PARAM;
+use swanky_field::FiniteField;
+use swanky_field_binary::F128b;
+
+use crate::f128b_to_ark;
 
 pub struct MaskedWitnessVar;
 
@@ -85,11 +89,6 @@ impl MaskedWitnessVar {
     ) -> Result<Vec<FpVar<Bn254Fr>>, SynthesisError> {
         // Initialize the result vector
         let mut masked_witnesses = Vec::with_capacity(d_delta_var.len());
-        print!(
-            "the length of witness_voles_var: {:?} \n",
-            witness_voles_var.len()
-        );
-
         // For each pair of witness vole and d_delta, compute the masked witness
         for (i, d_delta_array) in d_delta_var.iter().enumerate() {
             // Get the corresponding witness vole array
@@ -129,9 +128,7 @@ impl MaskedWitnessVar {
             // Start with the first element
             let mut combined = element_sums[0].clone();
 
-            // Use a constant for the "generator" - in a real implementation this should match
-            // the generator used in F8b::form_superfield
-            let generator_value = Bn254Fr::from(2u64); // Using 2 as a simple generator
+            let generator_value = f128b_to_ark(&F128b::GENERATOR);
             let mut generator = FpVar::new_constant(
                 ark_relations::ns!(
                     ark_relations::r1cs::ConstraintSystem::<Bn254Fr>::new_ref(),
@@ -187,9 +184,7 @@ impl MaskedWitnessVar {
     ) -> Result<FpVar<Bn254Fr>, SynthesisError> {
         // Create constants for ONE and GENERATOR
         let one = FpVar::new_constant(ark_relations::ns!(cs, "one"), Bn254Fr::from(1u64))?;
-
-        // Use 2 as a simple generator value (similar to what we did in compute_masked_witness)
-        let generator_value = Bn254Fr::from(2u64);
+        let generator_value = f128b_to_ark(&F128b::GENERATOR);
         let generator = FpVar::new_constant(ark_relations::ns!(cs, "generator"), generator_value)?;
 
         // Initialize accumulator and power

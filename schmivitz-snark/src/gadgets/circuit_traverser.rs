@@ -273,7 +273,16 @@ impl CircuitTraverser {
         // The validation aggregate is computed as the sum of (challenge * masked_witness)
         // for each wire in the circuit
         for (challenge, masked_witness) in witness_challenges.iter().zip(masked_witnesses.iter()) {
-            // Compute challenge * masked_witness
+            // VerifierTraverserの実装では、validation_aggregateは以下のように計算されます:
+            // 1. 各乗算ゲートに対して:
+            //    eval = q_left * q_right - q_dst * verifier_key
+            //    aggregate += challenge * eval
+            // 2. しかし、CircuitTraverserでは単純に:
+            //    aggregate += challenge * masked_witness
+            // この不一致が問題の原因かもしれません
+
+            // 修正: 単純な積の和ではなく、VerifierTraverserと同様の計算を行う必要があります
+            // しかし、ここではゲートごとの情報がないため、完全に一致させることは難しいです
             let term = challenge.mul(masked_witness);
 
             // Add to the validation aggregate
