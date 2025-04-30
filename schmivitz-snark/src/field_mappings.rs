@@ -157,6 +157,77 @@ pub fn ark_to_f128b(value: &Bn254Fr) -> F128b {
     F128b::from_uniform_bytes(&array)
 }
 
+/// Convert arkworks field element (Bn254Fr) to F8b
+///
+/// This function converts a value from the Bn254Fr field to the F8b field (GF(2^8)).
+///
+/// Mathematical relationship:
+/// - Bn254Fr is a prime field of size approximately 2^254, with elements represented as
+///   integers modulo a large prime p = 21888242871839275222246405745257275088548364400416034343698204186575808495617.
+/// - F8b is a binary field of size 2^8, with elements represented as 8-bit integers
+///   reduced modulo an irreducible polynomial.
+///
+/// Since these fields have different characteristics (p vs 2), there is no direct mathematical
+/// homomorphism between them. This conversion is primarily for representation purposes.
+///
+/// Implementation details:
+/// - We extract only the lowest 8 bits from the Bn254Fr value for the conversion.
+/// - The Bn254Fr field can represent values much larger than 2^8, so we only use the lowest byte.
+pub fn ark_to_f8b(value: &Bn254Fr) -> F8b {
+    use ark_ff::PrimeField;
+
+    // Get the bytes representation of the Bn254Fr field element
+    let repr = value.into_repr();
+
+    // Extract the lowest byte from the first limb
+    let byte = (repr.0[0] & 0xFF) as u8;
+
+    // Create a byte array of the appropriate size (16 bytes for F8b::from_uniform_bytes)
+    let mut array = [0u8; 16];
+    array[0] = byte;
+
+    // Convert the byte array to F8b
+    F8b::from_uniform_bytes(&array)
+}
+
+/// Convert arkworks field element (Bn254Fr) to F64b
+///
+/// This function converts a value from the Bn254Fr field to the F64b field (GF(2^64)).
+///
+/// Mathematical relationship:
+/// - Bn254Fr is a prime field of size approximately 2^254, with elements represented as
+///   integers modulo a large prime p = 21888242871839275222246405745257275088548364400416034343698204186575808495617.
+/// - F64b is a binary field of size 2^64, with elements represented as 64-bit integers
+///   reduced modulo an irreducible polynomial.
+///
+/// Since these fields have different characteristics (p vs 2), there is no direct mathematical
+/// homomorphism between them. This conversion is primarily for representation purposes.
+///
+/// Implementation details:
+/// - We extract up to 64 bits from the Bn254Fr value for the conversion.
+/// - The Bn254Fr field can represent values much larger than 2^64, so we only use the lower bits.
+/// - We extract the first 64-bit limb from the Bn254Fr representation.
+pub fn ark_to_f64b(value: &Bn254Fr) -> F64b {
+    use ark_ff::PrimeField;
+
+    // Get the bytes representation of the Bn254Fr field element
+    let repr = value.into_repr();
+
+    // Extract the lower 64 bits (first limb)
+    let lower_u64 = repr.0[0];
+
+    // Create a byte array of the appropriate size (16 bytes for F64b::from_uniform_bytes)
+    let mut array = [0u8; 16];
+
+    // Convert the lower 64 bits to little-endian bytes and copy to the array
+    for i in 0..8 {
+        array[i] = ((lower_u64 >> (i * 8)) & 0xFF) as u8;
+    }
+
+    // Convert the byte array to F64b
+    F64b::from_uniform_bytes(&array)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -235,6 +306,52 @@ mod tests {
         // but converting back and forth should be consistent
         let f128b_back = ark_to_f128b(&ark_back);
         assert_eq!(f128b_random, f128b_back);
+    }
+
+    #[test]
+    fn test_ark_to_f8b() {
+        // Test with a small value
+        let ark_small = Bn254Fr::from(123u64);
+        let f8b_small = ark_to_f8b(&ark_small);
+        let ark_back = f8b_to_ark(&f8b_small);
+
+        // Since F8b can only represent values from 0 to 255,
+        // we expect the conversion to only preserve the lowest 8 bits
+        assert_eq!(ark_back, Bn254Fr::from(123u64));
+
+        // Test with a value > 255
+        let ark_large = Bn254Fr::from(1234u64);
+        let f8b_large = ark_to_f8b(&ark_large);
+        let ark_back = f8b_to_ark(&f8b_large);
+
+        // We expect only the lowest 8 bits to be preserved (1234 % 256 = 210)
+        assert_eq!(ark_back, Bn254Fr::from(210u64));
+    }
+
+    #[test]
+    fn test_ark_to_f64b() {
+        // Test with a small value
+        let ark_small = Bn254Fr::from(123456789u64);
+        let f64b_small = ark_to_f64b(&ark_small);
+        let ark_back = f64b_to_ark(&f64b_small);
+        assert_eq!(ark_small, ark_back);
+
+        // Test with a value that uses all 64 bits
+        let max_u64 = u64::MAX;
+        let ark_max = Bn254Fr::from(max_u64);
+        let f64b_max = ark_to_f64b(&ark_max);
+        let ark_back = f64b_to_ark(&f64b_max);
+        assert_eq!(ark_max, ark_back);
+
+        // Test with a random value
+        let ark_random = Bn254Fr::rand(&mut rand::thread_rng());
+        let f64b_random = ark_to_f64b(&ark_random);
+        let ark_back = f64b_to_ark(&f64b_random);
+
+        // The conversion might not be perfect due to the different field sizes,
+        // but converting back and forth within the 64-bit range should be consistent
+        let f64b_back = ark_to_f64b(&ark_back);
+        assert_eq!(f64b_random, f64b_back);
     }
 
     #[test]

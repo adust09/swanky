@@ -98,6 +98,15 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &masked_witnesses_var,
         )?;
 
+        if cs.is_in_setup_mode() == false {
+            let validation_aggregate_value = validation_aggregate_var
+                .value()
+                .unwrap_or_else(|_| Bn254Fr::from(0u64));
+            println!(
+                "validation_aggregate_var = {:?}",
+                validation_aggregate_value
+            );
+        }
         // Step 3: Combine mask VOLEs to get validation_mask (q* in proof.rs)
         // Get the mask_voles from the partial_decommitment
         let mask_voles = self
@@ -123,10 +132,23 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
 
         // Step 5: Check the main constraint of the proof
         let actual_validation_var =
-            degree_1_commitment_var.clone() * verifier_key_var + degree_0_commitment_var;
+            degree_1_commitment_var * verifier_key_var + degree_0_commitment_var;
 
         // Enforce that validation equals actual_validation
-        println!("{:?} is unsatisfied", cs.which_is_unsatisfied());
+        if cs.is_in_setup_mode() == false {
+            let validation_value = validation_var
+                .value()
+                .unwrap_or_else(|_| Bn254Fr::from(0u64));
+            let actual_validation_value = actual_validation_var
+                .value()
+                .unwrap_or_else(|_| Bn254Fr::from(0u64));
+
+            println!("validation_var = {:?}\n", validation_value);
+            println!("actual_validation_var = {:?}\n", actual_validation_value);
+            println!("equal?: {}\n", validation_value == actual_validation_value);
+
+            debug_assert!(cs.is_satisfied().unwrap());
+        }
         validation_var.enforce_equal(&actual_validation_var)
     }
 }

@@ -226,6 +226,23 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     };
 
     // Serialize the circuit to JSON and save it
+    let serializable_circuit = serialize_bn254fr(&circuit);
+    // Write to circuit.json
+    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
+        if let Err(e) = fs::write("circuit.json", json) {
+            eprintln!("Failed to write circuit.json: {}", e);
+        } else {
+            println!("Circuit saved to circuit.json");
+        }
+    } else {
+        eprintln!("Failed to serialize circuit to JSON");
+    }
+
+    circuit
+}
+
+fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification {
+    // Convert the Bn254Fr value to a string representation
     let serializable_circuit = SerializableVoleVerification {
         witness_commitment: circuit.witness_commitment.as_ref().map(|wc| {
             wc.iter()
@@ -271,17 +288,5 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
             }),
         },
     };
-
-    // Write to circuit.json
-    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
-        if let Err(e) = fs::write("circuit.json", json) {
-            eprintln!("Failed to write circuit.json: {}", e);
-        } else {
-            println!("Circuit saved to circuit.json");
-        }
-    } else {
-        eprintln!("Failed to serialize circuit to JSON");
-    }
-
-    circuit
+    serializable_circuit
 }
