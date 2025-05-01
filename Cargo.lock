@@ -2695,6 +2695,9 @@ dependencies = [
 name = "schmivitz"
 version = "0.6.0"
 dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "ark-std",
  "base64",
  "blake3",
  "bristol2sieve",

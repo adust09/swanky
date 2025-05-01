@@ -38,11 +38,34 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .ok_or(SynthesisError::AssignmentMissing)
             },
         )?;
+
+        // Output witness_commitment_var values to console
+        // if cs.is_in_setup_mode() == false {
+        //     println!("witness_commitment_var values from constraints.rs:");
+        //     for (i, challenge) in witness_commitment_var.iter().enumerate() {
+        //         match challenge.value() {
+        //             Ok(value) => println!("  [{}]: {:?}", i, value),
+        //             Err(_) => println!("  [{}]: Error retrieving value", i),
+        //         }
+        //     }
+        //     println!();
+        // }
+
         let verifier_key_var = FpVar::new_witness(ark_relations::ns!(cs, "verifier_key"), || {
             self.partial_decommitment
                 .verifier_key
                 .ok_or(SynthesisError::AssignmentMissing)
         })?;
+
+        // Output verifier_key_var value to console
+        // if cs.is_in_setup_mode() == false {
+        //     println!("verifier_key from constraints.rs:");
+        //     match verifier_key_var.value() {
+        //         Ok(value) => println!("  {:?}", value),
+        //         Err(_) => println!("  Error retrieving value"),
+        //     }
+        //     println!();
+        // }
         let degree_0_commitment_var =
             FpVar::new_witness(ark_relations::ns!(cs, "degree_0_commitment"), || {
                 self.degree_0_commitment
@@ -82,6 +105,21 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             witness_voles_var.push(fp_vec);
         }
 
+        // Output witness_voles_var values to console
+        // if cs.is_in_setup_mode() == false {
+        //     println!("witness_voles from constraints.rs:");
+        //     for (i, vole_array) in witness_voles_var.iter().enumerate() {
+        //         println!("  witness_voles[{}]:", i);
+        //         for (j, vole) in vole_array.iter().enumerate() {
+        //             match vole.value() {
+        //                 Ok(value) => println!("    [{}]: {:?}", j, value),
+        //                 Err(_) => println!("    [{}]: Error retrieving value", j),
+        //             }
+        //         }
+        //     }
+        //     println!();
+        // }
+
         // Step 1: Compute d_delta from witness commitment and verifier key
         let d_delta_var = MaskedWitnessVar::compute_d_delta(
             cs.clone(),
@@ -89,9 +127,36 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
             &verifier_key_var,
         )?;
 
+        // Output d_delta_var values to console
+        if cs.is_in_setup_mode() == false {
+            println!("d_delta_var values from constraints.rs:");
+            for (i, dd_array) in d_delta_var.iter().enumerate() {
+                println!("d_delta_var[{}]:", i);
+                for (j, dd) in dd_array.iter().enumerate() {
+                    match dd.value() {
+                        Ok(value) => println!("  [{}]: {:?}", j, value),
+                        Err(_) => println!("  [{}]: Error retrieving value", j),
+                    }
+                }
+            }
+            println!();
+        }
+
         // Step 2: Compute masked witnesses from witness voles and d_delta
         let masked_witnesses_var =
             MaskedWitnessVar::compute_masked_witness(&witness_voles_var, &d_delta_var)?;
+
+        // Output masked_witnesses_var values to console
+        if cs.is_in_setup_mode() == false {
+            println!("masked_witnesses_var from constraints.rs:");
+            for (i, witness) in masked_witnesses_var.iter().enumerate() {
+                match witness.value() {
+                    Ok(value) => println!("  [{}]: {:?}", i, value),
+                    Err(_) => println!("  [{}]: Error retrieving value", i),
+                }
+            }
+            println!();
+        }
 
         let validation_aggregate_var = CircuitTraverser::compute_validation_aggregate(
             &witness_challenges_var,
@@ -120,6 +185,20 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
         for val in mask_voles.iter() {
             let var = FpVar::new_witness(ark_relations::ns!(cs, "mask_vole_element"), || Ok(*val))?;
             mask_voles_var.push(var);
+        }
+
+        // Output mask_voles_var values to console
+        if cs.is_in_setup_mode() == false {
+            println!("mask_voles from constraints.rs:");
+            for (i, vole) in mask_voles_var.iter().enumerate().take(10) {
+                // Only show first 10 to avoid too much output
+                match vole.value() {
+                    Ok(value) => println!("  [{}]: {:?}", i, value),
+                    Err(_) => println!("  [{}]: Error retrieving value", i),
+                }
+            }
+            println!("  ... (showing only first 10 elements)");
+            println!();
         }
 
         // Compute validation_mask using the refactored function

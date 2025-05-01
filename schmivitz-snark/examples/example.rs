@@ -80,10 +80,9 @@ fn main() -> Result<()> {
     let serializable_proof = to_serializable_proof(&schmivitz_proof);
     let proof_json = serde_json::to_string_pretty(&serializable_proof)?;
     fs::write("schmivitz_proof.json", proof_json)?;
-    println!("Saved proof to schmivitz_proof.json");
 
-    let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     // validate proof
+    let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     assert!(schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .is_ok());
@@ -117,50 +116,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-// Define serializable versions of the circuit structures
-#[derive(Serialize, Deserialize)]
-struct SerializableBn254Fr(String);
-
-#[derive(Serialize, Deserialize)]
-struct SerializablePartialDecommitment {
-    verifier_key: Option<SerializableBn254Fr>,
-    witness_voles: Option<Vec<Vec<SerializableBn254Fr>>>,
-    mask_voles: Option<Vec<SerializableBn254Fr>>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct SerializableVoleVerification {
-    witness_commitment: Option<Vec<SerializableBn254Fr>>,
-    witness_challenges: Option<Vec<SerializableBn254Fr>>,
-    degree_0_commitment: Option<SerializableBn254Fr>,
-    degree_1_commitment: Option<SerializableBn254Fr>,
-    partial_decommitment: SerializablePartialDecommitment,
-}
-
 fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
-    let mut transcript = Transcript::new(b"schmivitz-snark");
-    let mut transcript_wrapper = TranscriptWrapper::from(&mut transcript);
-
-    transcript_wrapper.append_public_values();
-
-    let witness_commitment_ark: Vec<Bn254Fr> = schmivitz_proof
-        .witness_commitment
-        .iter()
-        .map(f64b_to_ark)
-        .collect();
-    transcript_wrapper.append_witness_commitment(&witness_commitment_ark);
-
-    // Extract witness challenges from the transcript
-    // This ensures challenges are derived deterministically from the transcript
-    let expected_witness_challenges =
-        transcript_wrapper.extract_witness_challenges(schmivitz_proof.witness_challenges.len());
-
-    // Append polynomial commitments to continue the transcript
-    transcript_wrapper.append_polynomial_commitments(
-        f128b_to_ark(&schmivitz_proof.degree_0_commitment),
-        f128b_to_ark(&schmivitz_proof.degree_1_commitment),
-    );
-
     // convert vole to arkworks variants
     let circuit = VoleVerification {
         // vole_challenge(missed but only used in outside of verification logic)
@@ -171,10 +127,6 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
                 .map(f64b_to_ark)
                 .collect(),
         ),
-        // 元のコードではexpected_witness_challengesを使用していましたが、
-        // これがschmivitz_proof.witness_challengesと異なる可能性があります
-        // 修正: 実際のschmivitz_proof.witness_challengesを使用
-        // ここは検証が必要
         witness_challenges: Some(
             schmivitz_proof
                 .witness_challenges
@@ -226,19 +178,28 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     };
 
     // Serialize the circuit to JSON and save it
-    let serializable_circuit = serialize_bn254fr(&circuit);
-    // Write to circuit.json
-    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
-        if let Err(e) = fs::write("circuit.json", json) {
-            eprintln!("Failed to write circuit.json: {}", e);
-        } else {
-            println!("Circuit saved to circuit.json");
-        }
-    } else {
-        eprintln!("Failed to serialize circuit to JSON");
-    }
-
+    serialize_bn254fr(&circuit);
     circuit
+}
+
+// Define serializable versions of the circuit structures
+#[derive(Serialize, Deserialize)]
+struct SerializableBn254Fr(String);
+
+#[derive(Serialize, Deserialize)]
+struct SerializablePartialDecommitment {
+    verifier_key: Option<SerializableBn254Fr>,
+    witness_voles: Option<Vec<Vec<SerializableBn254Fr>>>,
+    mask_voles: Option<Vec<SerializableBn254Fr>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SerializableVoleVerification {
+    witness_commitment: Option<Vec<SerializableBn254Fr>>,
+    witness_challenges: Option<Vec<SerializableBn254Fr>>,
+    degree_0_commitment: Option<SerializableBn254Fr>,
+    degree_1_commitment: Option<SerializableBn254Fr>,
+    partial_decommitment: SerializablePartialDecommitment,
 }
 
 fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification {
@@ -288,5 +249,15 @@ fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification
             }),
         },
     };
+    // Write to vole-verification-circuit.json
+    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
+        if let Err(e) = fs::write("vole-verification-circuit.json", json) {
+            eprintln!("Failed to write vole-verification-circuit.json: {}", e);
+        } else {
+            println!("Circuit saved to vole-verification-circuit.json");
+        }
+    } else {
+        eprintln!("Failed to serialize circuit to JSON");
+    }
     serializable_circuit
 }

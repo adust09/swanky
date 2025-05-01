@@ -7,6 +7,7 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
+use ark_bn254::Fr as Bn254Fr;
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
@@ -18,7 +19,7 @@ use std::{
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F64b, F8b, F2};
-use tempfile::tempdir;
+use swanky_serialization::CanonicalSerialize;
 
 #[cfg(feature = "snark")]
 use schmivitz_snark::{prove, setup, verify, SnarkKeys, SnarkProof};
@@ -34,6 +35,83 @@ mod prover_preparer;
 mod prover_traverser;
 mod transcript;
 mod verifier_traverser;
+
+// Implement f8b_to_ark function directly to avoid circular dependency
+fn f8b_to_ark(value: &F8b) -> Bn254Fr {
+    // F8b is represented as a u8, so we need to convert it to a field element
+    // Get the bytes representation
+    let bytes = value.to_bytes();
+
+    // Convert the u8 value to a Bn254Fr field element
+    Bn254Fr::from(bytes[0] as u64)
+}
+
+pub fn f64b_to_ark(value: &F64b) -> Bn254Fr {
+    // F64b is represented as a u64, so we need to convert it to a field element
+    // Get the bytes representation
+    let bytes = value.to_bytes();
+
+    // Convert bytes to u64
+    let mut u64_value: u64 = 0;
+    for (i, &byte) in bytes.iter().enumerate() {
+        u64_value |= (byte as u64) << (i * 8);
+    }
+
+    // Convert the u64 value to a Bn254Fr field element
+    Bn254Fr::from(u64_value)
+}
+
+pub fn f128b_to_ark(value: &F128b) -> Bn254Fr {
+    use ark_ff::Field;
+    use ark_std::One;
+
+    // Get the bytes representation of the F128b value
+    let bytes = value.to_bytes();
+
+    // Extract the lower 64 bits
+    let mut lower_u64: u64 = 0;
+    for (i, &byte) in bytes.iter().take(8).enumerate() {
+        lower_u64 |= (byte as u64) << (i * 8);
+    }
+
+    // Extract the upper 64 bits
+    let mut upper_u64: u64 = 0;
+    for (i, &byte) in bytes.iter().skip(8).take(8).enumerate() {
+        upper_u64 |= (byte as u64) << (i * 8);
+    }
+
+    // Convert the lower 64 bits to a Bn254Fr field element
+    let lower_fr = Bn254Fr::from(lower_u64);
+
+    // If the upper 64 bits are all zero, we can just return the lower part
+    if upper_u64 == 0 {
+        return lower_fr;
+    }
+
+    // Convert the upper 64 bits to a Bn254Fr field element
+    let upper_fr = Bn254Fr::from(upper_u64);
+
+    // Calculate 2^64 in the Bn254Fr field
+    // We'll use repeated squaring to compute 2^64 efficiently
+    let mut power_of_two = Bn254Fr::from(2u64);
+    let mut shift_factor = Bn254Fr::one();
+
+    // Compute 2^64 using the binary exponentiation method
+    let mut exponent: u64 = 64;
+    while exponent > 0 {
+        if exponent & 1 == 1 {
+            shift_factor *= power_of_two;
+        }
+        power_of_two = power_of_two.square();
+        exponent >>= 1;
+    }
+
+    // Multiply the upper part by 2^64
+    let upper_shifted = upper_fr * shift_factor;
+
+    // Combine the two parts using field addition
+    lower_fr + upper_shifted
+}
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -222,6 +300,14 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: Witness challenges did not match expected values");
         }
 
+        // Output witness_challenges values converted to Bn254Fr
+        println!("witness_challenges values from proof.rs (converted to Bn254Fr):");
+        for (i, challenge) in self.witness_commitment.iter().enumerate() {
+            let challenge_ark = f64b_to_ark(challenge);
+            println!("  [{}]: {:?}", i, challenge_ark);
+        }
+        println!();
+
         // Add aggregated responses to the transcript
         transcript
             .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
@@ -232,6 +318,40 @@ impl Proof<InsecureVole> {
         if self.decommitment_challenge != expected_decommitment_challenge {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
+
+        // Output partial_decommitment components
+        // 1. verifier_key
+        println!("verifier_key from proof.rs:");
+        let verifier_key = f128b_to_ark(&self.partial_decommitment.verifier_key());
+        println!("  {:?}", verifier_key);
+        println!();
+
+        // 2. witness_voles
+        // println!("witness_voles from proof.rs (converted to Bn254Fr):");
+        // for (i, vole_array) in self.partial_decommitment.witness_voles().iter().enumerate() {
+        //     println!("  witness_voles[{}]:", i);
+        //     for (j, vole) in vole_array.iter().enumerate() {
+        //         let vole_ark = f8b_to_ark(vole);
+        //         println!("    [{}]: {:?}", j, vole_ark);
+        //     }
+        // }
+        // println!();
+
+        // // 3. mask_voles
+        // println!("mask_voles from proof.rs (converted to Bn254Fr):");
+        // for (i, vole) in self
+        //     .partial_decommitment
+        //     .mask_voles()
+        //     .iter()
+        //     .enumerate()
+        //     .take(10)
+        // {
+        //     // Only show first 10 to avoid too much output
+        //     let vole_ark = f128b_to_ark(vole);
+        //     println!("  [{}]: {:?}", i, vole_ark);
+        // }
+        // println!("  ... (showing only first 10 elements)");
+        // println!();
 
         // Q' = masked_witness = 16
         // Q[..l] = witness_voles = 16
@@ -273,6 +393,14 @@ impl Proof<InsecureVole> {
                 F8b::form_superfield(&masked_witness.into())
             })
             .collect::<Vec<_>>();
+
+        // Output masked_witnesses values
+        println!("masked_witnesses from proof.rs (converted to Bn254Fr):");
+        for (i, witness) in masked_witnesses.iter().enumerate() {
+            let witness_ark = f128b_to_ark(witness);
+            println!("  [{}]: {:?}", i, witness_ark);
+        }
+        println!();
 
         // Combine mask VOLEs to get q* (step.5)
         let validation_mask = combine(self.partial_decommitment.mask_voles());
@@ -605,7 +733,6 @@ mod tests {
         let serializable_proof = super::to_serializable_proof(&proof);
         let proof_json = serde_json::to_string_pretty(&serializable_proof)?;
         std::fs::write("proof.json", proof_json)?;
-        println!("Saved proof to proof.json");
 
         // Verify the proof
         assert!(proof.verify(&mut small_circuit, &mut transcript()).is_ok());
