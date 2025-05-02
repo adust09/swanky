@@ -1,5 +1,6 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
+use ark_ff::PrimeField;
+use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, R1CSVar};
 use ark_relations::r1cs::{ConstraintSystemRef, SynthesisError};
 use schmivitz::parameters::REPETITION_PARAM;
 use swanky_field::FiniteField;
@@ -40,22 +41,32 @@ impl MaskedWitnessVar {
             // Create an array of REPETITION_PARAM elements
             let mut delta_array = Vec::with_capacity(REPETITION_PARAM);
 
-            // In proof.rs, each witness commitment is multiplied by each key in the verifier_key_array
-            // Here, we'll create an array where the first element is commitment * verifier_key
-            // and the rest are zeros (since we don't have the bit conversion logic from proof.rs)
-            let delta = commitment.clone() * verifier_key_var.clone();
+            // Get the value of the commitment to check its first bit
+            // This is similar to the F2::decompose_superfield(witness_com) in proof.rs
+            let commitment_value = commitment.value().unwrap_or(Bn254Fr::from(0u64));
 
-            // Add the delta as the first element
-            delta_array.push(delta);
+            // Create a binary representation (0 or 1) based on whether the value is odd or even
+            // This is similar to checking the first bit in proof.rs
+            let is_odd = commitment_value.into_repr().0[0] & 1 == 1;
 
-            // Add zeros for the rest of the elements
-            for _ in 1..REPETITION_PARAM {
-                // Create a zero FpVar
-                let zero_var = FpVar::<Bn254Fr>::new_constant(
-                    ark_relations::ns!(cs, "zero"),
-                    Bn254Fr::from(0),
-                )?;
-                delta_array.push(zero_var);
+            // Create a constant for F8b::ONE or F8b::ZERO converted to Bn254Fr
+            let f8b_bit_value = if is_odd {
+                // Equivalent to f8b_to_ark(&F8b::ONE)
+                Bn254Fr::from(1u64)
+            } else {
+                // Equivalent to f8b_to_ark(&F8b::ZERO)
+                Bn254Fr::from(0u64)
+            };
+
+            let f8b_bit_var =
+                FpVar::<Bn254Fr>::new_constant(ark_relations::ns!(cs, "f8b_bit"), f8b_bit_value)?;
+
+            // In proof.rs, this F8b value is multiplied by each element in verifier_key_array
+            // For simplicity, we'll use the same value for all elements in the array
+            for _ in 0..REPETITION_PARAM {
+                // Multiply the binary bit by the verifier key
+                let delta = f8b_bit_var.clone() * verifier_key_var.clone();
+                delta_array.push(delta);
             }
 
             // Convert Vec to array

@@ -7,7 +7,6 @@
 //! Emmanuela Orsini, Lawrence Roy, and Peter Scholl. [Publicly Verifiable Zero-Knowledge and
 //! Post-Quantum Signatures from VOLE-in-the-head](https://eprint.iacr.org/2023/996). 2023.
 //!
-use ark_bn254::Fr as Bn254Fr;
 use eyre::{bail, Result};
 use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, Type};
 use merlin::Transcript;
@@ -19,7 +18,6 @@ use std::{
 };
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F64b, F8b, F2};
-use swanky_serialization::CanonicalSerialize;
 
 #[cfg(feature = "snark")]
 use schmivitz_snark::{prove, setup, verify, SnarkKeys, SnarkProof};
@@ -35,83 +33,6 @@ mod prover_preparer;
 mod prover_traverser;
 mod transcript;
 mod verifier_traverser;
-
-// Implement f8b_to_ark function directly to avoid circular dependency
-fn f8b_to_ark(value: &F8b) -> Bn254Fr {
-    // F8b is represented as a u8, so we need to convert it to a field element
-    // Get the bytes representation
-    let bytes = value.to_bytes();
-
-    // Convert the u8 value to a Bn254Fr field element
-    Bn254Fr::from(bytes[0] as u64)
-}
-
-pub fn f64b_to_ark(value: &F64b) -> Bn254Fr {
-    // F64b is represented as a u64, so we need to convert it to a field element
-    // Get the bytes representation
-    let bytes = value.to_bytes();
-
-    // Convert bytes to u64
-    let mut u64_value: u64 = 0;
-    for (i, &byte) in bytes.iter().enumerate() {
-        u64_value |= (byte as u64) << (i * 8);
-    }
-
-    // Convert the u64 value to a Bn254Fr field element
-    Bn254Fr::from(u64_value)
-}
-
-pub fn f128b_to_ark(value: &F128b) -> Bn254Fr {
-    use ark_ff::Field;
-    use ark_std::One;
-
-    // Get the bytes representation of the F128b value
-    let bytes = value.to_bytes();
-
-    // Extract the lower 64 bits
-    let mut lower_u64: u64 = 0;
-    for (i, &byte) in bytes.iter().take(8).enumerate() {
-        lower_u64 |= (byte as u64) << (i * 8);
-    }
-
-    // Extract the upper 64 bits
-    let mut upper_u64: u64 = 0;
-    for (i, &byte) in bytes.iter().skip(8).take(8).enumerate() {
-        upper_u64 |= (byte as u64) << (i * 8);
-    }
-
-    // Convert the lower 64 bits to a Bn254Fr field element
-    let lower_fr = Bn254Fr::from(lower_u64);
-
-    // If the upper 64 bits are all zero, we can just return the lower part
-    if upper_u64 == 0 {
-        return lower_fr;
-    }
-
-    // Convert the upper 64 bits to a Bn254Fr field element
-    let upper_fr = Bn254Fr::from(upper_u64);
-
-    // Calculate 2^64 in the Bn254Fr field
-    // We'll use repeated squaring to compute 2^64 efficiently
-    let mut power_of_two = Bn254Fr::from(2u64);
-    let mut shift_factor = Bn254Fr::one();
-
-    // Compute 2^64 using the binary exponentiation method
-    let mut exponent: u64 = 64;
-    while exponent > 0 {
-        if exponent & 1 == 1 {
-            shift_factor *= power_of_two;
-        }
-        power_of_two = power_of_two.square();
-        exponent >>= 1;
-    }
-
-    // Multiply the upper part by 2^64
-    let upper_shifted = upper_fr * shift_factor;
-
-    // Combine the two parts using field addition
-    lower_fr + upper_shifted
-}
 
 /// Zero-knowledge proof of knowledge of a circuit.
 #[derive(Debug, Clone)]
@@ -132,6 +53,23 @@ pub struct Proof<Vole: RandomVole> {
     pub decommitment_challenge: Vole::VoleDecommitmentChallenge,
     /// Partial decommitment of the VOLEs.
     pub partial_decommitment: Vole::Decommitment,
+}
+
+/// Result of the verification process containing all intermediate and final values
+#[derive(Debug, Clone)]
+pub struct VerificationResult {
+    /// The final validation value (validation_aggregate + validation_mask)
+    pub validation: F128b,
+    /// The actual validation value (degree_1_commitment * verifier_key + degree_0_commitment)
+    pub actual_validation: F128b,
+    /// The d_delta values computed from witness commitment and verifier key
+    pub d_delta: Vec<[F8b; 16]>,
+    /// The masked witnesses computed from witness voles and d_delta
+    pub masked_witnesses: Vec<F128b>,
+    /// The validation mask computed from mask voles
+    pub validation_mask: F128b,
+    /// The validation aggregate computed from circuit traversal
+    pub validation_aggregate: F128b,
 }
 
 impl<Vole: RandomVole> Proof<Vole> {
@@ -273,7 +211,12 @@ impl Proof<InsecureVole> {
 
     /// Verify the proof.
     ///
-    pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
+
+    pub fn verify<T>(
+        &self,
+        circuit: &mut T,
+        transcript: &mut Transcript,
+    ) -> Result<VerificationResult>
     where
         T: Read + Seek + Clone,
     {
@@ -300,14 +243,6 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: Witness challenges did not match expected values");
         }
 
-        // Output witness_challenges values converted to Bn254Fr
-        println!("witness_challenges values from proof.rs (converted to Bn254Fr):");
-        for (i, challenge) in self.witness_commitment.iter().enumerate() {
-            let challenge_ark = f64b_to_ark(challenge);
-            println!("  [{}]: {:?}", i, challenge_ark);
-        }
-        println!();
-
         // Add aggregated responses to the transcript
         transcript
             .append_polynomial_commitments(&self.degree_0_commitment, &self.degree_1_commitment);
@@ -318,40 +253,6 @@ impl Proof<InsecureVole> {
         if self.decommitment_challenge != expected_decommitment_challenge {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
-
-        // Output partial_decommitment components
-        // 1. verifier_key
-        println!("verifier_key from proof.rs:");
-        let verifier_key = f128b_to_ark(&self.partial_decommitment.verifier_key());
-        println!("  {:?}", verifier_key);
-        println!();
-
-        // 2. witness_voles
-        // println!("witness_voles from proof.rs (converted to Bn254Fr):");
-        // for (i, vole_array) in self.partial_decommitment.witness_voles().iter().enumerate() {
-        //     println!("  witness_voles[{}]:", i);
-        //     for (j, vole) in vole_array.iter().enumerate() {
-        //         let vole_ark = f8b_to_ark(vole);
-        //         println!("    [{}]: {:?}", j, vole_ark);
-        //     }
-        // }
-        // println!();
-
-        // // 3. mask_voles
-        // println!("mask_voles from proof.rs (converted to Bn254Fr):");
-        // for (i, vole) in self
-        //     .partial_decommitment
-        //     .mask_voles()
-        //     .iter()
-        //     .enumerate()
-        //     .take(10)
-        // {
-        //     // Only show first 10 to avoid too much output
-        //     let vole_ark = f128b_to_ark(vole);
-        //     println!("  [{}]: {:?}", i, vole_ark);
-        // }
-        // println!("  ... (showing only first 10 elements)");
-        // println!();
 
         // Q' = masked_witness = 16
         // Q[..l] = witness_voles = 16
@@ -382,7 +283,7 @@ impl Proof<InsecureVole> {
             })
             .collect::<Vec<_>>();
 
-        let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta)
+        let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta.clone())
             .map(|(qs, dds)| {
                 // NB: This unwrap is safe because we know the two input arrays are each exactly length 16.
                 let masked_witness: [F8b; 16] = zip(qs, dds)
@@ -395,12 +296,6 @@ impl Proof<InsecureVole> {
             .collect::<Vec<_>>();
 
         // Output masked_witnesses values
-        println!("masked_witnesses from proof.rs (converted to Bn254Fr):");
-        for (i, witness) in masked_witnesses.iter().enumerate() {
-            let witness_ark = f128b_to_ark(witness);
-            println!("  [{}]: {:?}", i, witness_ark);
-        }
-        println!();
 
         // Combine mask VOLEs to get q* (step.5)
         let validation_mask = combine(self.partial_decommitment.mask_voles());
@@ -409,7 +304,7 @@ impl Proof<InsecureVole> {
         let mut verifier_traverser = VerifierTraverser::new(
             self.witness_challenges.clone(),
             self.partial_decommitment.verifier_key(),
-            masked_witnesses,
+            masked_witnesses.clone(),
         )?;
         let reader = RelationReader::new(circuit)?;
         reader.read(&mut verifier_traverser)?;
@@ -424,7 +319,16 @@ impl Proof<InsecureVole> {
         if validation != actual_validation {
             bail!("Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses");
         }
-        Ok(())
+
+        // Create and return the verification result with all the requested values
+        Ok(VerificationResult {
+            validation,
+            actual_validation,
+            d_delta,
+            masked_witnesses,
+            validation_mask,
+            validation_aggregate,
+        })
     }
 }
 
@@ -689,6 +593,7 @@ mod tests {
             @end";
 
         let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        // Just check if verification succeeds, we don't need to access the result fields
         assert!(proof?.verify(&mut mini_circuit, &mut transcript()).is_ok());
 
         Ok(())
@@ -735,6 +640,7 @@ mod tests {
         std::fs::write("proof.json", proof_json)?;
 
         // Verify the proof
+        // Just check if verification succeeds, we don't need to access the result fields
         assert!(proof.verify(&mut small_circuit, &mut transcript()).is_ok());
 
         Ok(())
@@ -760,6 +666,7 @@ mod tests {
         // If we use a different transcript to verify, it'll fail
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
+        // Just check if verification fails with different transcript
         assert!(proof?.verify(&mut small_circuit, transcript).is_err());
 
         Ok(())
@@ -815,6 +722,7 @@ mod tests {
         too_many_challenges
             .witness_challenges
             .push(F128b::random(rng));
+        // Just check if verification fails with too many challenges
         assert!(too_many_challenges
             .verify(&mut small_circuit.clone(), &mut transcript())
             .is_err());
@@ -822,6 +730,7 @@ mod tests {
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
         too_few_challenges.witness_challenges.pop();
+        // Just check if verification fails with too few challenges
         assert!(too_few_challenges
             .verify(small_circuit, &mut transcript())
             .is_err());

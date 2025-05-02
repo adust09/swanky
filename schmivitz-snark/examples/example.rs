@@ -13,11 +13,15 @@ use schmivitz::{
     parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM},
     to_serializable_proof, Proof,
 };
+// Import the VerificationResult directly from the proof module
+use schmivitz::proof::VerificationResult;
 use schmivitz_snark::{
-    f128b_to_ark, f64b_to_ark, f8b_to_ark, PartialDecommitmentVar, TranscriptWrapper,
-    VoleVerification,
+    f128b_to_ark, f64b_to_ark, f8b_to_ark,
+    serializable::{
+        SerializableBn254Fr, SerializablePartialDecommitment, SerializableVoleVerification,
+    },
+    PartialDecommitmentVar, VoleVerification,
 };
-use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -83,11 +87,11 @@ fn main() -> Result<()> {
 
     // validate proof
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
-    assert!(schmivitz_proof
+    let verification_result = schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
-        .is_ok());
+        .expect("Verification should succeed");
 
-    let circuit_defining_cs = build_circuit(schmivitz_proof.clone());
+    let circuit_defining_cs = build_circuit(schmivitz_proof.clone(), &verification_result);
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit_defining_cs, &mut rng).unwrap();
@@ -101,7 +105,7 @@ fn main() -> Result<()> {
     fs::write(&output_path, solidity_verifier)?;
     println!("Solidity verifier generated at: {}", output_path.display());
 
-    let circuit_to_verify_against = build_circuit(schmivitz_proof.clone());
+    let circuit_to_verify_against = build_circuit(schmivitz_proof.clone(), &verification_result);
     let public_input = vec![];
 
     // cs unsatisfied
@@ -116,7 +120,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
+fn build_circuit(
+    schmivitz_proof: Proof<InsecureVole>,
+    verification_result: &VerificationResult,
+) -> VoleVerification {
     // convert vole to arkworks variants
     let circuit = VoleVerification {
         // vole_challenge(missed but only used in outside of verification logic)
@@ -175,6 +182,25 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
                 Some(result)
             },
         },
+        // Add the new fields
+        // d_delta: Some(
+        //     verification_result
+        //         .d_delta
+        //         .iter()
+        //         .map(|arr| arr.iter().map(|v| f8b_to_ark(v)).collect())
+        //         .collect(),
+        // ),
+        // masked_witnesses: Some(
+        //     verification_result
+        //         .masked_witnesses
+        //         .iter()
+        //         .map(|v| f128b_to_ark(v))
+        //         .collect(),
+        // ),
+        // validation_mask: Some(f128b_to_ark(&verification_result.validation_mask)),
+        // validation_aggregate: Some(f128b_to_ark(&verification_result.validation_aggregate)),
+        // validation_from_schmivitz: Some(f128b_to_ark(&verification_result.validation)),
+        // actual_validation: Some(f128b_to_ark(&verification_result.actual_validation)),
     };
 
     // Serialize the circuit to JSON and save it
@@ -182,25 +208,7 @@ fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerification {
     circuit
 }
 
-// Define serializable versions of the circuit structures
-#[derive(Serialize, Deserialize)]
-struct SerializableBn254Fr(String);
-
-#[derive(Serialize, Deserialize)]
-struct SerializablePartialDecommitment {
-    verifier_key: Option<SerializableBn254Fr>,
-    witness_voles: Option<Vec<Vec<SerializableBn254Fr>>>,
-    mask_voles: Option<Vec<SerializableBn254Fr>>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct SerializableVoleVerification {
-    witness_commitment: Option<Vec<SerializableBn254Fr>>,
-    witness_challenges: Option<Vec<SerializableBn254Fr>>,
-    degree_0_commitment: Option<SerializableBn254Fr>,
-    degree_1_commitment: Option<SerializableBn254Fr>,
-    partial_decommitment: SerializablePartialDecommitment,
-}
+// Using serializable structures from the shared module
 
 fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification {
     // Convert the Bn254Fr value to a string representation
@@ -248,6 +256,11 @@ fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification
                     .collect()
             }),
         },
+        // Add the new fields with None values since they're not used in this context
+        d_delta: None,
+        masked_witnesses: None,
+        validation_mask: None,
+        validation_aggregate: None,
     };
     // Write to vole-verification-circuit.json
     if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {

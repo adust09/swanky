@@ -1,37 +1,17 @@
 #[cfg(test)]
 mod tests {
     use crate::constraints::{PartialDecommitmentVar, VoleVerification};
+    use crate::serializable::{
+        SerializableBn254Fr, SerializablePartialDecommitment, SerializableVoleVerification,
+    };
     use ark_bn254::Fr as Bn254Fr;
     use ark_relations::r1cs::{
-        ConstraintLayer, ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef,
-        TracingMode::OnlyConstraints,
+        ConstraintLayer, ConstraintSynthesizer, ConstraintSystem, TracingMode::OnlyConstraints,
     };
     use schmivitz::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
-    use serde::{Deserialize, Serialize};
     use serde_json;
     use std::fs;
-    use tracing::subscriber;
     use tracing_subscriber::layer::SubscriberExt;
-
-    // Define serializable versions of the circuit structures
-    #[derive(Serialize, Deserialize)]
-    struct SerializableBn254Fr(String);
-
-    #[derive(Serialize, Deserialize)]
-    struct SerializablePartialDecommitment {
-        verifier_key: Option<SerializableBn254Fr>,
-        witness_voles: Option<Vec<Vec<SerializableBn254Fr>>>,
-        mask_voles: Option<Vec<SerializableBn254Fr>>,
-    }
-
-    #[derive(Serialize, Deserialize)]
-    struct SerializableVoleVerification {
-        witness_commitment: Option<Vec<SerializableBn254Fr>>,
-        witness_challenges: Option<Vec<SerializableBn254Fr>>,
-        degree_0_commitment: Option<SerializableBn254Fr>,
-        degree_1_commitment: Option<SerializableBn254Fr>,
-        partial_decommitment: SerializablePartialDecommitment,
-    }
     /// Helper function to create a test circuit with default values
     fn create_test_circuit() -> VoleVerification {
         // Create the circuit
@@ -138,6 +118,11 @@ mod tests {
                         .collect(),
                 ),
             },
+            // Add the new fields with None values since they're not used in this context
+            d_delta: None,
+            masked_witnesses: None,
+            validation_mask: None,
+            validation_aggregate: None,
         };
 
         // Write to test_circuit.json

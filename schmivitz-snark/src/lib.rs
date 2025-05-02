@@ -2,6 +2,7 @@ mod constraints;
 mod field_mappings;
 mod gadgets;
 mod prover;
+pub mod serializable;
 #[cfg(test)]
 mod tests;
 
