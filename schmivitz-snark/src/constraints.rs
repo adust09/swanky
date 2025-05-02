@@ -3,7 +3,10 @@ use ark_r1cs_std::{fields::fp::FpVar, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use schmivitz::parameters::{REPETITION_PARAM, VOLE_SIZE_PARAM};
 
-use crate::gadgets::{CircuitTraverser, MaskedWitnessVar};
+use crate::{
+    gadgets::{CircuitTraverser, MaskedWitnessVar},
+    save_variables_to_json,
+};
 
 #[derive(Debug, Clone)]
 pub struct VoleVerification {
@@ -14,13 +17,17 @@ pub struct VoleVerification {
     pub degree_1_commitment: Option<Bn254Fr>,
     //decommitment_challenge(missed but only used in outside of verification logic)
     pub partial_decommitment: PartialDecommitmentVar,
-    // New fields
-    // pub d_delta: Option<Vec<Vec<Bn254Fr>>>,
-    // pub masked_witnesses: Option<Vec<Bn254Fr>>,
-    // pub validation_mask: Option<Bn254Fr>,
-    // pub validation_aggregate: Option<Bn254Fr>,
-    // pub validation_from_schmivitz: Option<Bn254Fr>,
-    // pub actual_validation: Option<Bn254Fr>,
+    pub schmivitz_values: Option<SchmivitzValues>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SchmivitzValues {
+    pub d_delta: Option<Vec<Vec<Bn254Fr>>>,
+    pub masked_witnesses: Option<Vec<Bn254Fr>>,
+    pub validation_mask: Option<Bn254Fr>,
+    pub validation_aggregate: Option<Bn254Fr>,
+    pub validation_from_schmivitz: Option<Bn254Fr>,
+    pub actual_validation: Option<Bn254Fr>,
 }
 #[derive(Debug, Clone)]
 pub struct PartialDecommitmentVar {
@@ -62,48 +69,66 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                 self.degree_1_commitment
                     .ok_or(SynthesisError::AssignmentMissing)
             })?;
-        // let d_delta_from_schmivitz_var =
-        //     FpVar::new_witness(ark_relations::ns!(cs, "d_delta_from_schmivitz"), || {
-        //         self.d_delta
-        //             .as_ref()
-        //             .and_then(|v| v.first().and_then(|inner| inner.first()))
-        //             .copied()
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     })?;
-        // let mask_witness_from_schmivitz_var = FpVar::new_witness(
-        //     ark_relations::ns!(cs, "mask_witness_from_schmivitz"),
-        //     || {
-        //         self.masked_witnesses
-        //             .as_ref()
-        //             .and_then(|v| v.first())
-        //             .copied()
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     },
-        // )?;
-        // let validation_mask_from_schmivitz_var = FpVar::new_witness(
-        //     ark_relations::ns!(cs, "validation_mask_from_schmivitz"),
-        //     || {
-        //         self.validation_mask
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     },
-        // )?;
-        // let validation_aggregate_from_schmivitz_var =
-        //     FpVar::new_witness(ark_relations::ns!(cs, "validation_aggregate"), || {
-        //         self.validation_aggregate
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     })?;
-        // let validation_from_schmivitz_var =
-        //     FpVar::new_witness(ark_relations::ns!(cs, "validation_from_schmivitz"), || {
-        //         self.validation_from_schmivitz
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     })?;
-        // let actual_validation_from_schmivitz_var = FpVar::new_witness(
-        //     ark_relations::ns!(cs, "actual_validation_from_schmivitz"),
-        //     || {
-        //         self.actual_validation
-        //             .ok_or(SynthesisError::AssignmentMissing)
-        //     },
-        // )?;
+        let d_delta_from_schmivitz_var =
+            FpVar::new_witness(ark_relations::ns!(cs, "d_delta_from_schmivitz"), || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .d_delta
+                    .as_ref()
+                    .and_then(|v| v.first().and_then(|inner| inner.first()))
+                    .copied()
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+        let mask_witness_from_schmivitz_var = FpVar::new_witness(
+            ark_relations::ns!(cs, "mask_witness_from_schmivitz"),
+            || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .masked_witnesses
+                    .as_ref()
+                    .and_then(|v| v.first())
+                    .copied()
+                    .ok_or(SynthesisError::AssignmentMissing)
+            },
+        )?;
+        let validation_mask_from_schmivitz_var = FpVar::new_witness(
+            ark_relations::ns!(cs, "validation_mask_from_schmivitz"),
+            || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .validation_mask
+                    .ok_or(SynthesisError::AssignmentMissing)
+            },
+        )?;
+        let validation_aggregate_from_schmivitz_var =
+            FpVar::new_witness(ark_relations::ns!(cs, "validation_aggregate"), || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .validation_aggregate
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+        let validation_from_schmivitz_var =
+            FpVar::new_witness(ark_relations::ns!(cs, "validation_from_schmivitz"), || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .validation_from_schmivitz
+                    .ok_or(SynthesisError::AssignmentMissing)
+            })?;
+        let actual_validation_from_schmivitz_var = FpVar::new_witness(
+            ark_relations::ns!(cs, "actual_validation_from_schmivitz"),
+            || {
+                self.schmivitz_values
+                    .clone()
+                    .unwrap()
+                    .actual_validation
+                    .ok_or(SynthesisError::AssignmentMissing)
+            },
+        )?;
 
         // Get the witness voles from the partial decommitment
         let witness_voles = self

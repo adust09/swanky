@@ -73,7 +73,7 @@ pub struct ArkVars {
 /// * `witness_voles_var` - Vector of vectors of witness vole variables
 /// * `validation_from_schmivitz_var` - Optional validation from schmivitz variable
 /// * `actual_validation_from_schmivitz_var` - Optional actual validation from schmivitz variable
-fn save_variables_to_json(
+pub fn save_variables_to_json(
     witness_commitment_var: &Vec<FpVar<Bn254Fr>>,
     witness_challenges_var: &Vec<FpVar<Bn254Fr>>,
     verifier_key_var: &FpVar<Bn254Fr>,

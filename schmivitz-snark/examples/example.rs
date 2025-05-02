@@ -20,7 +20,7 @@ use schmivitz_snark::{
     serializable::{
         SerializableBn254Fr, SerializablePartialDecommitment, SerializableVoleVerification,
     },
-    PartialDecommitmentVar, VoleVerification,
+    PartialDecommitmentVar, SchmivitzValues, VoleVerification,
 };
 use std::{
     fs::{self, File},
@@ -183,24 +183,26 @@ fn build_circuit(
             },
         },
         // Add the new fields
-        // d_delta: Some(
-        //     verification_result
-        //         .d_delta
-        //         .iter()
-        //         .map(|arr| arr.iter().map(|v| f8b_to_ark(v)).collect())
-        //         .collect(),
-        // ),
-        // masked_witnesses: Some(
-        //     verification_result
-        //         .masked_witnesses
-        //         .iter()
-        //         .map(|v| f128b_to_ark(v))
-        //         .collect(),
-        // ),
-        // validation_mask: Some(f128b_to_ark(&verification_result.validation_mask)),
-        // validation_aggregate: Some(f128b_to_ark(&verification_result.validation_aggregate)),
-        // validation_from_schmivitz: Some(f128b_to_ark(&verification_result.validation)),
-        // actual_validation: Some(f128b_to_ark(&verification_result.actual_validation)),
+        schmivitz_values: Some(SchmivitzValues {
+            d_delta: Some(
+                verification_result
+                    .d_delta
+                    .iter()
+                    .map(|arr| arr.iter().map(|v| f8b_to_ark(v)).collect())
+                    .collect(),
+            ),
+            masked_witnesses: Some(
+                verification_result
+                    .masked_witnesses
+                    .iter()
+                    .map(|v| f128b_to_ark(v))
+                    .collect(),
+            ),
+            validation_mask: Some(f128b_to_ark(&verification_result.validation_mask)),
+            validation_aggregate: Some(f128b_to_ark(&verification_result.validation_aggregate)),
+            validation_from_schmivitz: Some(f128b_to_ark(&verification_result.validation)),
+            actual_validation: Some(f128b_to_ark(&verification_result.actual_validation)),
+        }),
     };
 
     // Serialize the circuit to JSON and save it
