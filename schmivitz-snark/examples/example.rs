@@ -91,10 +91,10 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    let circuit_defining_cs = build_circuit(schmivitz_proof.clone(), &verification_result);
+    let circuit = build_circuit(schmivitz_proof.clone(), &verification_result);
 
     let mut rng = ark_std::test_rng();
-    let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit_defining_cs, &mut rng).unwrap();
+    let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
 
     let solidity_verifier = Groth16::<Bn254>::export(&vk);
     let output_dir = Path::new("solidity_output");
@@ -105,11 +105,9 @@ fn main() -> Result<()> {
     fs::write(&output_path, solidity_verifier)?;
     println!("Solidity verifier generated at: {}", output_path.display());
 
-    let circuit_to_verify_against = build_circuit(schmivitz_proof.clone(), &verification_result);
     let public_input = vec![];
 
-    // cs unsatisfied
-    let snark_proof = Groth16::prove(&pk, circuit_to_verify_against, &mut rng)?;
+    let snark_proof = Groth16::prove(&pk, circuit, &mut rng)?;
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
 
     println!(
@@ -182,15 +180,20 @@ fn build_circuit(
                 Some(result)
             },
         },
-        // Add the new fields
         schmivitz_values: Some(SchmivitzValues {
-            d_delta: Some(
-                verification_result
-                    .d_delta
-                    .iter()
-                    .map(|arr| arr.iter().map(|v| f8b_to_ark(v)).collect())
-                    .collect(),
-            ),
+            d_delta: Some({
+                let mut result = Vec::new();
+                for arr in verification_result.d_delta.iter() {
+                    let mut converted_arr = [Bn254Fr::default(); REPETITION_PARAM];
+                    for (i, val) in arr.iter().enumerate() {
+                        if i < REPETITION_PARAM {
+                            converted_arr[i] = f8b_to_ark(val);
+                        }
+                    }
+                    result.push(converted_arr);
+                }
+                result
+            }),
             masked_witnesses: Some(
                 verification_result
                     .masked_witnesses
@@ -201,7 +204,7 @@ fn build_circuit(
             validation_mask: Some(f128b_to_ark(&verification_result.validation_mask)),
             validation_aggregate: Some(f128b_to_ark(&verification_result.validation_aggregate)),
             validation_from_schmivitz: Some(f128b_to_ark(&verification_result.validation)),
-            actual_validation: Some(f128b_to_ark(&verification_result.actual_validation)),
+            actual_validation: Some(f128b_to_ark(&verification_result.validation)),
         }),
     };
 

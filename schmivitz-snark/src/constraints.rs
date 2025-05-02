@@ -22,7 +22,7 @@ pub struct VoleVerification {
 
 #[derive(Debug, Clone)]
 pub struct SchmivitzValues {
-    pub d_delta: Option<Vec<Vec<Bn254Fr>>>,
+    pub d_delta: Option<Vec<[Bn254Fr; REPETITION_PARAM]>>,
     pub masked_witnesses: Option<Vec<Bn254Fr>>,
     pub validation_mask: Option<Bn254Fr>,
     pub validation_aggregate: Option<Bn254Fr>,
@@ -76,11 +76,10 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
                     .unwrap()
                     .d_delta
                     .as_ref()
-                    .and_then(|v| v.first().and_then(|inner| inner.first()))
-                    .copied()
+                    .and_then(|v| v.first().map(|arr| arr[0]))
                     .ok_or(SynthesisError::AssignmentMissing)
             })?;
-        let mask_witness_from_schmivitz_var = FpVar::new_witness(
+        let masked_witness_from_schmivitz_var = FpVar::new_witness(
             ark_relations::ns!(cs, "mask_witness_from_schmivitz"),
             || {
                 self.schmivitz_values
@@ -200,31 +199,37 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
         // Step 5: Check the main constraint of the proof
         let actual_validation_var = degree_1_commitment_var.clone() * verifier_key_var.clone()
             + degree_0_commitment_var.clone();
-
+        // validation_var.enforce_equal(&actual_validation_var)
+        let result = validation_aggregate_from_schmivitz_var.clone()
+            + validation_mask_from_schmivitz_var.clone();
         // Optionally store the values in a JSON file
-        // if cs.is_in_setup_mode() == false {
-        //     save_variables_to_json(
-        //         &witness_commitment_var,
-        //         &witness_challenges_var,
-        //         &verifier_key_var,
-        //         &degree_0_commitment_var,
-        //         &degree_1_commitment_var,
-        //         &validation_var,
-        //         &actual_validation_var,
-        //         &validation_aggregate_var,
-        //         &validation_mask_var,
-        //         &masked_witnesses_var,
-        //         &d_delta_var,
-        //         &mask_voles_var,
-        //         &witness_voles_var,
-        //         None, // validation_from_schmivitz_var
-        //         None, // actual_validation_from_schmivitz_var
-        //     );
-        // }
-        // Enforce that validation equals actual_validation
-        validation_var.enforce_equal(&actual_validation_var) // 計算が合わない
-                                                             // validation_from_schmivitz_var.enforce_equal(&actual_validation_from_schmivitz_var)
-                                                             // IDが合わない
+        if cs.is_in_setup_mode() == false {
+            // Convert d_delta_var to match the expected type Vec<[FpVar<Bn254Fr>; REPETITION_PARAM]>
+            save_variables_to_json(
+                &witness_commitment_var,
+                &witness_challenges_var,
+                &verifier_key_var,
+                &degree_0_commitment_var,
+                &degree_1_commitment_var,
+                &validation_var,
+                &actual_validation_var,
+                &validation_aggregate_var,
+                &validation_mask_var,
+                &masked_witnesses_var,
+                &d_delta_var,
+                &mask_voles_var,
+                &witness_voles_var,
+                Some(&validation_from_schmivitz_var),
+                Some(&actual_validation_from_schmivitz_var),
+                // New parameters
+                &d_delta_from_schmivitz_var,
+                &masked_witness_from_schmivitz_var,
+                &validation_aggregate_from_schmivitz_var,
+                &validation_mask_from_schmivitz_var,
+                &result, // Add the result variable
+            );
+        }
+        Ok(())
     }
 }
 

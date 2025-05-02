@@ -25,7 +25,7 @@ pub struct SerializableVoleVerification {
     pub degree_1_commitment: Option<SerializableBn254Fr>,
     pub partial_decommitment: SerializablePartialDecommitment,
     // Optional additional fields that might be used in some contexts
-    pub d_delta: Option<Vec<Vec<SerializableBn254Fr>>>,
+    pub d_delta: Option<Vec<[SerializableBn254Fr; REPETITION_PARAM]>>,
     pub masked_witnesses: Option<Vec<SerializableBn254Fr>>,
     pub validation_mask: Option<SerializableBn254Fr>,
     pub validation_aggregate: Option<SerializableBn254Fr>,
@@ -49,6 +49,12 @@ pub struct ArkVars {
     pub d_delta: Vec<String>,
     pub mask_voles: Vec<String>,
     pub witness_voles: Vec<Vec<String>>,
+    // New fields
+    pub d_delta_from_schmivitz: String,
+    pub masked_witness_from_schmivitz: String,
+    pub validation_aggregate_from_schmivitz: String,
+    pub validation_mask_from_schmivitz: String,
+    pub result: String,
 }
 
 /// Save circuit variables to a JSON file
@@ -73,6 +79,8 @@ pub struct ArkVars {
 /// * `witness_voles_var` - Vector of vectors of witness vole variables
 /// * `validation_from_schmivitz_var` - Optional validation from schmivitz variable
 /// * `actual_validation_from_schmivitz_var` - Optional actual validation from schmivitz variable
+use schmivitz::parameters::REPETITION_PARAM;
+
 pub fn save_variables_to_json(
     witness_commitment_var: &Vec<FpVar<Bn254Fr>>,
     witness_challenges_var: &Vec<FpVar<Bn254Fr>>,
@@ -84,11 +92,17 @@ pub fn save_variables_to_json(
     validation_aggregate_var: &FpVar<Bn254Fr>,
     validation_mask_var: &FpVar<Bn254Fr>,
     masked_witnesses_var: &Vec<FpVar<Bn254Fr>>,
-    d_delta_var: &Vec<FpVar<Bn254Fr>>,
+    d_delta_var: &Vec<[FpVar<Bn254Fr>; REPETITION_PARAM]>,
     mask_voles_var: &Vec<FpVar<Bn254Fr>>,
     witness_voles_var: &Vec<Vec<FpVar<Bn254Fr>>>,
     validation_from_schmivitz_var: Option<&FpVar<Bn254Fr>>,
     actual_validation_from_schmivitz_var: Option<&FpVar<Bn254Fr>>,
+    // New parameters
+    d_delta_from_schmivitz_var: &FpVar<Bn254Fr>,
+    masked_witness_from_schmivitz_var: &FpVar<Bn254Fr>,
+    validation_aggregate_from_schmivitz_var: &FpVar<Bn254Fr>,
+    validation_mask_from_schmivitz_var: &FpVar<Bn254Fr>,
+    result_var: &FpVar<Bn254Fr>,
 ) {
     // Extract values from FpVar variables
     let ark_vars = ArkVars {
@@ -115,7 +129,13 @@ pub fn save_variables_to_json(
             .collect(),
         d_delta: d_delta_var
             .iter()
-            .map(|v| format!("{:?}", v.value().unwrap_or_default()))
+            .map(|arr| {
+                // Convert each array element to a string and join them
+                arr.iter()
+                    .map(|v| format!("{:?}", v.value().unwrap_or_default()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
             .collect(),
         mask_voles: mask_voles_var
             .iter()
@@ -135,6 +155,30 @@ pub fn save_variables_to_json(
         actual_validation_from_schmivitz: actual_validation_from_schmivitz_var
             .map(|v| format!("{:?}", v.value().unwrap_or_default()))
             .unwrap_or_default(),
+        // New fields
+        d_delta_from_schmivitz: format!(
+            "{:?}",
+            d_delta_from_schmivitz_var.value().unwrap_or_default()
+        ),
+        masked_witness_from_schmivitz: format!(
+            "{:?}",
+            masked_witness_from_schmivitz_var
+                .value()
+                .unwrap_or_default()
+        ),
+        validation_aggregate_from_schmivitz: format!(
+            "{:?}",
+            validation_aggregate_from_schmivitz_var
+                .value()
+                .unwrap_or_default()
+        ),
+        validation_mask_from_schmivitz: format!(
+            "{:?}",
+            validation_mask_from_schmivitz_var
+                .value()
+                .unwrap_or_default()
+        ),
+        result: format!("{:?}", result_var.value().unwrap_or_default()),
     };
 
     // Serialize to JSON and write to file
