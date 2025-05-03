@@ -84,7 +84,7 @@ pub struct ArkVars {
 /// * `actual_validation_from_schmivitz_var` - Optional actual validation from schmivitz variable
 use schmivitz::parameters::REPETITION_PARAM;
 
-use crate::{vole_verification_revised::VoleVerificationRevised, VoleVerification};
+use crate::VoleVerification;
 
 pub fn save_variables_to_json(
     witness_commitment_var: &Vec<FpVar<Bn254Fr>>,
@@ -269,9 +269,7 @@ pub fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerifica
     serializable_circuit
 }
 
-pub fn serialize_bn254fr_revised(
-    circuit: &VoleVerificationRevised,
-) -> SerializableVoleVerification {
+pub fn serialize_bn254fr_revised(circuit: &VoleVerification) -> SerializableVoleVerification {
     // Convert the Bn254Fr value to a string representation
     let serializable_circuit = SerializableVoleVerification {
         witness_commitment: circuit.witness_commitment.as_ref().map(|wc| {
