@@ -1,5 +1,6 @@
 pub mod constraints;
 mod constraints_revise;
+pub mod constraints_revised;
 mod field_mappings;
 mod gadgets;
 mod prover;
@@ -14,6 +15,7 @@ pub use prover::{SnarkKeys, SnarkProof};
 pub use gadgets::{CircuitTraverser, MaskedWitnessVar, TranscriptWrapper, WireId, WireRange};
 
 pub use constraints::{SchmivitzValues, VoleVerification};
+pub use constraints_revised::VoleVerificationRevised as VoleVerificationRevised2;
 pub use vole_verification_revised::{PartialDecommitmentVar, VoleVerificationRevised};
 
 // Re-export field conversion functions
