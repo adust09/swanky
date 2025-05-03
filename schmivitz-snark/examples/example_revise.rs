@@ -14,13 +14,10 @@ use schmivitz::{
     to_serializable_proof, Proof,
 };
 // Import the VerificationResult directly from the proof module
-use schmivitz::proof::VerificationResult;
 use schmivitz_snark::{
-    f128b_to_ark, f64b_to_ark, f8b_to_ark, serializable::serialize_bn254fr, SchmivitzValues,
-    VoleVerification,
+    f128b_to_ark, f64b_to_ark, f8b_to_ark,
+    vole_verification_revised::{PartialDecommitmentVar, VoleVerificationRevised},
 };
-// Import PartialDecommitmentVar from the same module as VoleVerification
-use schmivitz_snark::constraints::PartialDecommitmentVar;
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
@@ -90,7 +87,7 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    let circuit = build_circuit(schmivitz_proof.clone(), &verification_result);
+    let circuit = build_circuit(schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
@@ -117,12 +114,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build_circuit(
-    schmivitz_proof: Proof<InsecureVole>,
-    verification_result: &VerificationResult,
-) -> VoleVerification {
+fn build_circuit(schmivitz_proof: Proof<InsecureVole>) -> VoleVerificationRevised {
     // convert vole to arkworks variants
-    let circuit = VoleVerification {
+    let circuit = VoleVerificationRevised {
         // vole_challenge(missed but only used in outside of verification logic)
         witness_commitment: Some(
             schmivitz_proof
@@ -179,35 +173,9 @@ fn build_circuit(
                 Some(result)
             },
         },
-        schmivitz_values: Some(SchmivitzValues {
-            d_delta: Some({
-                let mut result = Vec::new();
-                for arr in verification_result.d_delta.iter() {
-                    let mut converted_arr = [Bn254Fr::default(); REPETITION_PARAM];
-                    for (i, val) in arr.iter().enumerate() {
-                        if i < REPETITION_PARAM {
-                            converted_arr[i] = f8b_to_ark(val);
-                        }
-                    }
-                    result.push(converted_arr);
-                }
-                result
-            }),
-            masked_witnesses: Some(
-                verification_result
-                    .masked_witnesses
-                    .iter()
-                    .map(|v| f128b_to_ark(v))
-                    .collect(),
-            ),
-            validation_mask: Some(f128b_to_ark(&verification_result.validation_mask)),
-            validation_aggregate: Some(f128b_to_ark(&verification_result.validation_aggregate)),
-            validation_from_schmivitz: Some(f128b_to_ark(&verification_result.validation)),
-            actual_validation: Some(f128b_to_ark(&verification_result.validation)),
-        }),
     };
 
-    // Serialize the circuit to JSON and save it
-    serialize_bn254fr(&circuit);
+    // Skip serialization for now
+    // serialize_bn254fr_revised(&circuit);
     circuit
 }

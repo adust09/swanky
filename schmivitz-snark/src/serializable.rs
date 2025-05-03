@@ -1,4 +1,7 @@
-use std::{fs::File, io::Write};
+use std::{
+    fs::{self, File},
+    io::Write,
+};
 
 use ark_bn254::Fr as Bn254Fr;
 use ark_r1cs_std::{fields::fp::FpVar, R1CSVar};
@@ -80,6 +83,8 @@ pub struct ArkVars {
 /// * `validation_from_schmivitz_var` - Optional validation from schmivitz variable
 /// * `actual_validation_from_schmivitz_var` - Optional actual validation from schmivitz variable
 use schmivitz::parameters::REPETITION_PARAM;
+
+use crate::{vole_verification_revised::VoleVerificationRevised, VoleVerification};
 
 pub fn save_variables_to_json(
     witness_commitment_var: &Vec<FpVar<Bn254Fr>>,
@@ -195,4 +200,138 @@ pub fn save_variables_to_json(
         },
         Err(e) => println!("Error serializing variables: {}", e),
     }
+}
+
+// Using serializable structures from the shared module
+
+pub fn serialize_bn254fr(circuit: &VoleVerification) -> SerializableVoleVerification {
+    // Convert the Bn254Fr value to a string representation
+    let serializable_circuit = SerializableVoleVerification {
+        witness_commitment: circuit.witness_commitment.as_ref().map(|wc| {
+            wc.iter()
+                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                .collect()
+        }),
+        witness_challenges: circuit.witness_challenges.as_ref().map(|wc| {
+            wc.iter()
+                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                .collect()
+        }),
+        degree_0_commitment: circuit
+            .degree_0_commitment
+            .as_ref()
+            .map(|fr| SerializableBn254Fr(fr.to_string())),
+        degree_1_commitment: circuit
+            .degree_1_commitment
+            .as_ref()
+            .map(|fr| SerializableBn254Fr(fr.to_string())),
+        partial_decommitment: SerializablePartialDecommitment {
+            verifier_key: circuit
+                .partial_decommitment
+                .verifier_key
+                .as_ref()
+                .map(|fr| SerializableBn254Fr(fr.to_string())),
+            witness_voles: circuit
+                .partial_decommitment
+                .witness_voles
+                .as_ref()
+                .map(|wv| {
+                    wv.iter()
+                        .map(|arr| {
+                            arr.iter()
+                                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                                .collect()
+                        })
+                        .collect()
+                }),
+            mask_voles: circuit.partial_decommitment.mask_voles.as_ref().map(|mv| {
+                mv.iter()
+                    .map(|fr| SerializableBn254Fr(fr.to_string()))
+                    .collect()
+            }),
+        },
+        // Add the new fields with None values since they're not used in this context
+        d_delta: None,
+        masked_witnesses: None,
+        validation_mask: None,
+        validation_aggregate: None,
+    };
+    // Write to vole-verification-circuit.json
+    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
+        if let Err(e) = fs::write("vole-verification-circuit.json", json) {
+            eprintln!("Failed to write vole-verification-circuit.json: {}", e);
+        } else {
+            println!("Circuit saved to vole-verification-circuit.json");
+        }
+    } else {
+        eprintln!("Failed to serialize circuit to JSON");
+    }
+    serializable_circuit
+}
+
+pub fn serialize_bn254fr_revised(
+    circuit: &VoleVerificationRevised,
+) -> SerializableVoleVerification {
+    // Convert the Bn254Fr value to a string representation
+    let serializable_circuit = SerializableVoleVerification {
+        witness_commitment: circuit.witness_commitment.as_ref().map(|wc| {
+            wc.iter()
+                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                .collect()
+        }),
+        witness_challenges: circuit.witness_challenges.as_ref().map(|wc| {
+            wc.iter()
+                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                .collect()
+        }),
+        degree_0_commitment: circuit
+            .degree_0_commitment
+            .as_ref()
+            .map(|fr| SerializableBn254Fr(fr.to_string())),
+        degree_1_commitment: circuit
+            .degree_1_commitment
+            .as_ref()
+            .map(|fr| SerializableBn254Fr(fr.to_string())),
+        partial_decommitment: SerializablePartialDecommitment {
+            verifier_key: circuit
+                .partial_decommitment
+                .verifier_key
+                .as_ref()
+                .map(|fr| SerializableBn254Fr(fr.to_string())),
+            witness_voles: circuit
+                .partial_decommitment
+                .witness_voles
+                .as_ref()
+                .map(|wv| {
+                    wv.iter()
+                        .map(|arr| {
+                            arr.iter()
+                                .map(|fr| SerializableBn254Fr(fr.to_string()))
+                                .collect()
+                        })
+                        .collect()
+                }),
+            mask_voles: circuit.partial_decommitment.mask_voles.as_ref().map(|mv| {
+                mv.iter()
+                    .map(|fr| SerializableBn254Fr(fr.to_string()))
+                    .collect()
+            }),
+        },
+        // Add the new fields with None values since they're not used in this context
+        d_delta: None,
+        masked_witnesses: None,
+        validation_mask: None,
+        validation_aggregate: None,
+    };
+    // Write to vole-verification-circuit.json
+    if let Ok(json) = serde_json::to_string_pretty(&serializable_circuit) {
+        if let Err(e) = fs::write("vole-verification-circuit.json", json) {
+            eprintln!("Failed to write vole-verification-circuit.json: {}", e);
+        } else {
+            println!("Circuit saved to vole-verification-circuit.json");
+        }
+    } else {
+        eprintln!("Failed to serialize circuit to JSON");
+    }
+    serializable_circuit
 }
