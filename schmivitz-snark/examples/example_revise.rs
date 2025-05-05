@@ -11,8 +11,8 @@ use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, to_serializable_proof, Proof};
 // Import the boolean array conversion functions
 use schmivitz_snark::{
+    constraints_revise::{PartialDecommitmentBoolean, VoleVerificationBoolean},
     f128b_to_boolean_array, f64b_to_boolean_array, f8b_to_boolean_array,
-    vole_verification_boolean::{PartialDecommitmentBoolean, VoleVerificationBoolean},
 };
 use std::{
     fs::{self, File},

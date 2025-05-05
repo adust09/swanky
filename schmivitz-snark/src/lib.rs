@@ -1,11 +1,11 @@
 pub mod constraints;
+pub mod constraints_revise;
 mod field_mappings;
 mod gadgets;
 mod prover;
 pub mod serializable;
 #[cfg(test)]
 mod tests;
-pub mod vole_verification_boolean;
 
 pub use prover::{SnarkKeys, SnarkProof};
 
@@ -13,7 +13,7 @@ pub use prover::{SnarkKeys, SnarkProof};
 pub use gadgets::{CircuitTraverser, MaskedWitnessVar, TranscriptWrapper, WireId, WireRange};
 
 pub use constraints::{SchmivitzValues, VoleVerification};
-pub use vole_verification_boolean::{PartialDecommitmentBoolean, VoleVerificationBoolean};
+pub use constraints_revise::{PartialDecommitmentBoolean, VoleVerificationBoolean};
 
 // Re-export field conversion functions
 pub use field_mappings::{
