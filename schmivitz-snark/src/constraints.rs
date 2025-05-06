@@ -340,12 +340,8 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationBoolean {
         )?;
 
         // Step 3: Compute validation_mask
-        let validation_mask_var = MaskedWitnessVarRevised::compute_validation_mask(
-            cs.clone(),
-            &self.partial_decommitment.mask_voles,
-        )?;
-
-        println!("is_satisfied: {:?}\n", cs.is_satisfied());
+        let validation_mask_var =
+            MaskedWitnessVarRevised::combine(cs.clone(), &self.partial_decommitment.mask_voles)?;
 
         let validation_aggregate_var =
             MaskedWitnessVarRevised::compute_validation_aggregate_revise(

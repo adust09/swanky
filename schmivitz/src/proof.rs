@@ -298,7 +298,7 @@ impl Proof<InsecureVole> {
         // Output masked_witnesses values
 
         // Combine mask VOLEs to get q* (step.5)
-        let validation_mask = combine(self.partial_decommitment.mask_voles());
+        let validation_mask = combine(self.partial_decommitment.mask_voles()); // this point
 
         // Run circuit traversal and get the aggregate value (part of c~) (step.6)
         let mut verifier_traverser = VerifierTraverser::new(

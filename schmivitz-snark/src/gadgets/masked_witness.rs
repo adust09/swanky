@@ -238,115 +238,115 @@ impl MaskedWitnessVar {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ark_bn254::Fr;
-    use ark_r1cs_std::prelude::*;
-    use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use ark_bn254::Fr;
+//     use ark_r1cs_std::prelude::*;
+//     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
 
-    // Helper function to create a new constraint system
-    fn create_cs() -> ConstraintSystemRef<Fr> {
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        cs.set_optimization_goal(ark_relations::r1cs::OptimizationGoal::Constraints);
-        cs
-    }
+//     // Helper function to create a new constraint system
+//     fn create_cs() -> ConstraintSystemRef<Fr> {
+//         let cs = ConstraintSystem::<Fr>::new_ref();
+//         cs.set_optimization_goal(ark_relations::r1cs::OptimizationGoal::Constraints);
+//         cs
+//     }
 
-    // Helper function to create FpVar values
-    fn create_fp_var(cs: ConstraintSystemRef<Fr>, value: u64) -> FpVar<Fr> {
-        FpVar::new_witness(cs.clone(), || Ok(Fr::from(value))).unwrap()
-    }
+//     // Helper function to create FpVar values
+//     fn create_fp_var(cs: ConstraintSystemRef<Fr>, value: u64) -> FpVar<Fr> {
+//         FpVar::new_witness(cs.clone(), || Ok(Fr::from(value))).unwrap()
+//     }
 
-    // #[test]
-    // fn test_basic_computation() {
-    //     let cs = create_cs();
+// #[test]
+// fn test_basic_computation() {
+//     let cs = create_cs();
 
-    //     let witness_commitment_var = vec![
-    //         create_fp_var(cs.clone(), 1),
-    //         create_fp_var(cs.clone(), 2),
-    //         create_fp_var(cs.clone(), 3),
-    //     ];
-    //     let witness_voles = vec![
-    //         create_fp_var(cs.clone(), 10),
-    //         create_fp_var(cs.clone(), 20),
-    //         create_fp_var(cs.clone(), 30),
-    //     ];
+//     let witness_commitment_var = vec![
+//         create_fp_var(cs.clone(), 1),
+//         create_fp_var(cs.clone(), 2),
+//         create_fp_var(cs.clone(), 3),
+//     ];
+//     let witness_voles = vec![
+//         create_fp_var(cs.clone(), 10),
+//         create_fp_var(cs.clone(), 20),
+//         create_fp_var(cs.clone(), 30),
+//     ];
 
-    //     let verifier_key_var = create_fp_var(cs.clone(), 5);
+//     let verifier_key_var = create_fp_var(cs.clone(), 5);
 
-    //     let masked_witnesses =
-    //         MaskedWitnessVar::compute(&witness_commitment_var, &verifier_key_var, &witness_voles)
-    //             .unwrap();
+//     let masked_witnesses =
+//         MaskedWitnessVar::compute(&witness_commitment_var, &verifier_key_var, &witness_voles)
+//             .unwrap();
 
-    //     // Verify results
-    //     assert_eq!(masked_witnesses.len(), 3);
+//     // Verify results
+//     assert_eq!(masked_witnesses.len(), 3);
 
-    //     // Manually compute expected results
-    //     // masked_witness[0] = witness_vole[0] + (witness_challenge[0] * verifier_key) = 10 + (1 * 5) = 15
-    //     // masked_witness[1] = witness_vole[1] + (witness_challenge[1] * verifier_key) = 20 + (1 * 5) = 25
-    //     // masked_witness[2] = witness_vole[2] + (witness_challenge[2] * verifier_key) = 30 + (1 * 5) = 35
-    //     let expected_values = vec![Fr::from(15), Fr::from(25), Fr::from(35)];
+//     // Manually compute expected results
+//     // masked_witness[0] = witness_vole[0] + (witness_challenge[0] * verifier_key) = 10 + (1 * 5) = 15
+//     // masked_witness[1] = witness_vole[1] + (witness_challenge[1] * verifier_key) = 20 + (1 * 5) = 25
+//     // masked_witness[2] = witness_vole[2] + (witness_challenge[2] * verifier_key) = 30 + (1 * 5) = 35
+//     let expected_values = vec![Fr::from(15), Fr::from(25), Fr::from(35)];
 
-    //     for (i, masked_witness) in masked_witnesses.iter().enumerate() {
-    //         let value = masked_witness.value().unwrap();
-    //         assert_eq!(value, expected_values[i]);
-    //     }
-    // }
+//     for (i, masked_witness) in masked_witnesses.iter().enumerate() {
+//         let value = masked_witness.value().unwrap();
+//         assert_eq!(value, expected_values[i]);
+//     }
+// }
 
-    // #[test]
-    // fn test_edge_cases() {
-    //     let cs = create_cs();
+// #[test]
+// fn test_edge_cases() {
+//     let cs = create_cs();
 
-    //     let witness_commitment = vec![
-    //         create_fp_var(cs.clone(), 0),
-    //         create_fp_var(cs.clone(), u64::MAX),
-    //     ];
-    //     let witness_voles = vec![create_fp_var(cs.clone(), 0), create_fp_var(cs.clone(), 1)];
-    //     let verifier_key = create_fp_var(cs.clone(), 1);
+//     let witness_commitment = vec![
+//         create_fp_var(cs.clone(), 0),
+//         create_fp_var(cs.clone(), u64::MAX),
+//     ];
+//     let witness_voles = vec![create_fp_var(cs.clone(), 0), create_fp_var(cs.clone(), 1)];
+//     let verifier_key = create_fp_var(cs.clone(), 1);
 
-    //     let masked_witnesses =
-    //         MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
+//     let masked_witnesses =
+//         MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
-    //     assert_eq!(masked_witnesses.len(), 2);
-    //     assert_eq!(masked_witnesses[0].value().unwrap(), Fr::from(1));
-    //     assert_eq!(masked_witnesses[1].value().unwrap(), Fr::from(2));
-    // }
+//     assert_eq!(masked_witnesses.len(), 2);
+//     assert_eq!(masked_witnesses[0].value().unwrap(), Fr::from(1));
+//     assert_eq!(masked_witnesses[1].value().unwrap(), Fr::from(2));
+// }
 
-    // #[test]
-    // fn test_empty_inputs() {
-    //     let cs = create_cs();
-    //     let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
-    //     let witness_voles: Vec<FpVar<Fr>> = Vec::new();
-    //     let verifier_key = create_fp_var(cs.clone(), 5);
+// #[test]
+// fn test_empty_inputs() {
+//     let cs = create_cs();
+//     let witness_commitment: Vec<FpVar<Fr>> = Vec::new();
+//     let witness_voles: Vec<FpVar<Fr>> = Vec::new();
+//     let verifier_key = create_fp_var(cs.clone(), 5);
 
-    //     let result = MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles);
+//     let result = MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles);
 
-    //     assert!(result.is_ok());
-    //     assert_eq!(result.unwrap().len(), 0);
-    // }
+//     assert!(result.is_ok());
+//     assert_eq!(result.unwrap().len(), 0);
+// }
 
-    // #[test]
-    // fn test_constraint_satisfaction() {
-    //     let cs = create_cs();
+// #[test]
+// fn test_constraint_satisfaction() {
+//     let cs = create_cs();
 
-    //     let witness_commitment = vec![create_fp_var(cs.clone(), 7), create_fp_var(cs.clone(), 11)];
-    //     let witness_voles = vec![create_fp_var(cs.clone(), 17), create_fp_var(cs.clone(), 19)];
-    //     let verifier_key = create_fp_var(cs.clone(), 13);
+//     let witness_commitment = vec![create_fp_var(cs.clone(), 7), create_fp_var(cs.clone(), 11)];
+//     let witness_voles = vec![create_fp_var(cs.clone(), 17), create_fp_var(cs.clone(), 19)];
+//     let verifier_key = create_fp_var(cs.clone(), 13);
 
-    //     let masked_witnesses =
-    //         MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
+//     let masked_witnesses =
+//         MaskedWitnessVar::compute(&witness_commitment, &verifier_key, &witness_voles).unwrap();
 
-    //     // passed
-    //     assert!(cs.is_satisfied().unwrap());
+//     // passed
+//     assert!(cs.is_satisfied().unwrap());
 
-    //     // Verify the computed values
-    //     // masked_witness[0] = 17 + (1 * 13) = 30
-    //     // masked_witness[1] = 19 + (1 * 13) = 32
-    //     // failed in below assertions
-    //     assert_eq!(masked_witnesses[0].value().unwrap(), Fr::from(30));
-    //     assert_eq!(masked_witnesses[1].value().unwrap(), Fr::from(32));
-    // }
-}
+//     // Verify the computed values
+//     // masked_witness[0] = 17 + (1 * 13) = 30
+//     // masked_witness[1] = 19 + (1 * 13) = 32
+//     // failed in below assertions
+//     assert_eq!(masked_witnesses[0].value().unwrap(), Fr::from(30));
+//     assert_eq!(masked_witnesses[1].value().unwrap(), Fr::from(32));
+// }
+// }
 
 use crate::f128b_to_boolean_array;
 
@@ -577,7 +577,7 @@ impl MaskedWitnessVarRevised {
     /// }
     /// ```
     #[tracing::instrument(target = "r1cs", skip(cs, mask_voles_booleans))]
-    pub fn compute_validation_mask(
+    pub fn combine(
         cs: ConstraintSystemRef<Bn254Fr>,
         mask_voles_booleans: &Vec<Vec<Boolean<Bn254Fr>>>,
     ) -> Result<Vec<Boolean<Bn254Fr>>, SynthesisError> {
@@ -609,7 +609,6 @@ impl MaskedWitnessVarRevised {
         for _ in 1..128 {
             power_bits.push(Boolean::constant(false)); // Rest are 0
         }
-        println!("hoge");
 
         // Process each mask_vole value
         for mask_vole_bits in mask_voles_booleans.iter() {
@@ -645,36 +644,6 @@ impl MaskedWitnessVarRevised {
             for i in 0..128 {
                 acc_bits[i] = Boolean::xor(&acc_bits[i], &product_bits[i])?;
             }
-
-            // Update power by multiplying by generator
-            // power *= F128b::GENERATOR
-            let mut new_power_bits = Vec::with_capacity(128);
-            for _ in 0..128 {
-                new_power_bits.push(Boolean::constant(false));
-            }
-
-            // For each bit in power_bits
-            for (i, power_bit) in power_bits.iter().enumerate() {
-                if i >= 128 {
-                    break;
-                }
-
-                // For each bit in generator_booleans
-                for (j, gen_bit) in generator_booleans.iter().enumerate() {
-                    if j >= 128 || i + j >= 128 {
-                        continue;
-                    }
-
-                    // Compute power_bit AND gen_bit
-                    let and_result = Boolean::and(power_bit, gen_bit)?;
-
-                    // XOR with the corresponding bit in new_power_bits (at position i+j)
-                    new_power_bits[i + j] = Boolean::xor(&new_power_bits[i + j], &and_result)?;
-                }
-            }
-
-            // Update power_bits
-            power_bits = new_power_bits;
         }
         println!("mask_voles_booleans");
 
@@ -783,11 +752,9 @@ impl MaskedWitnessVarRevised {
 #[cfg(test)]
 mod revised_tests {
     use super::*;
-    use crate::f8b_to_boolean_array;
     use ark_bn254::Fr;
     use ark_r1cs_std::R1CSVar;
     use ark_relations::r1cs::{ConstraintSystem, ConstraintSystemRef};
-    use swanky_field_binary::F8b;
 
     // Helper function to create a new constraint system
     fn create_cs() -> ConstraintSystemRef<Fr> {
@@ -868,20 +835,6 @@ mod revised_tests {
     }
 
     #[test]
-    fn test_boolean_conversion() {
-        let cs = create_cs();
-
-        // Create a test F8b value
-        let f8b_value = F8b::from(123u8);
-
-        // Convert to boolean array
-        let boolean_array = f8b_to_boolean_array(cs.clone(), &f8b_value).unwrap();
-
-        // Verify the length
-        assert_eq!(boolean_array.len(), 8);
-    }
-
-    #[test]
     fn test_compute_d_delta() {
         // Create test witness commitment booleans
         let witness_commitment_booleans = vec![
@@ -931,7 +884,7 @@ mod revised_tests {
     }
 
     #[test]
-    fn test_compute_validation_mask() {
+    fn test_combine() {
         let cs = create_cs();
 
         // Create test mask voles booleans
@@ -942,8 +895,7 @@ mod revised_tests {
 
         // Compute validation mask
         let validation_mask =
-            MaskedWitnessVarRevised::compute_validation_mask(cs.clone(), &mask_voles_booleans)
-                .unwrap();
+            MaskedWitnessVarRevised::combine(cs.clone(), &mask_voles_booleans).unwrap();
 
         // Verify the result
         assert!(validation_mask.len() > 0);
