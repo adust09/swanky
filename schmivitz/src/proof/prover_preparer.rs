@@ -219,7 +219,6 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 mod tests {
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
-    use swanky_field_binary::{F64b, F2};
 
     use crate::proof::prover_preparer::ProverPreparer;
 

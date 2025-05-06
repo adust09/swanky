@@ -19,6 +19,9 @@ use std::{
 use swanky_field::{FiniteField, FiniteRing, IsSubFieldOf};
 use swanky_field_binary::{F128b, F64b, F8b, F2};
 
+#[cfg(feature = "snark")]
+use schmivitz_snark::{prove, setup, verify, SnarkKeys, SnarkProof};
+
 use crate::{
     proof::{prover_preparer::ProverPreparer, prover_traverser::ProverTraverser},
     vole::{insecure::InsecureVole, RandomVole},
@@ -35,21 +38,38 @@ mod verifier_traverser;
 #[derive(Debug, Clone)]
 pub struct Proof<Vole: RandomVole> {
     /// Challenge generated in VOLE creation.
-    vole_challenge: Vole::VoleChallenge,
+    pub vole_challenge: Vole::VoleChallenge,
     /// Commitment to the extended witness ($`d`$ in the paper).
-    witness_commitment: Vec<F64b>,
+    pub witness_commitment: Vec<F64b>,
     /// Challenges generated after committing to the witness
-    witness_challenges: Vec<F128b>,
+    pub witness_challenges: Vec<F128b>,
     /// Aggregated commitment to the degree-0 term coefficients for each gate in the circuit
     /// ($`\tilde b`$ in the paper).
-    degree_0_commitment: F128b,
+    pub degree_0_commitment: F128b,
     /// Aggregated commitment to the degree-1 term coefficients for each gate in the circuit
     /// ($`\tilde a`$ in the paper).
-    degree_1_commitment: F128b,
+    pub degree_1_commitment: F128b,
     /// Challenge generated to decommit to the VOLEs after committing to the degree coefficients.
-    decommitment_challenge: Vole::VoleDecommitmentChallenge,
+    pub decommitment_challenge: Vole::VoleDecommitmentChallenge,
     /// Partial decommitment of the VOLEs.
-    partial_decommitment: Vole::Decommitment,
+    pub partial_decommitment: Vole::Decommitment,
+}
+
+/// Result of the verification process containing all intermediate and final values
+#[derive(Debug, Clone)]
+pub struct VerificationResult {
+    /// The final validation value (validation_aggregate + validation_mask)
+    pub validation: F128b,
+    /// The actual validation value (degree_1_commitment * verifier_key + degree_0_commitment)
+    pub actual_validation: F128b,
+    /// The d_delta values computed from witness commitment and verifier key
+    pub d_delta: Vec<[F8b; 16]>,
+    /// The masked witnesses computed from witness voles and d_delta
+    pub masked_witnesses: Vec<F128b>,
+    /// The validation mask computed from mask voles
+    pub validation_mask: F128b,
+    /// The validation aggregate computed from circuit traversal
+    pub validation_aggregate: F128b,
 }
 
 impl<Vole: RandomVole> Proof<Vole> {
@@ -191,7 +211,12 @@ impl Proof<InsecureVole> {
 
     /// Verify the proof.
     ///
-    pub fn verify<T>(&self, circuit: &mut T, transcript: &mut Transcript) -> Result<()>
+
+    pub fn verify<T>(
+        &self,
+        circuit: &mut T,
+        transcript: &mut Transcript,
+    ) -> Result<VerificationResult>
     where
         T: Read + Seek + Clone,
     {
@@ -229,7 +254,12 @@ impl Proof<InsecureVole> {
             bail!("Verification failed: VOLE challenge did not match expected value");
         }
 
-        // Compute masked witnesses Q' = Q[..l] + d * Delta
+        // Q' = masked_witness = 16
+        // Q[..l] = witness_voles = 16
+        // d = witness_com = 10
+        // Delta = key = 16
+
+        // Compute masked witnesses Q' = Q[..l] + d * Delta (step.2)
         let d_delta = self
             .witness_commitment
             .iter()
@@ -252,7 +282,8 @@ impl Proof<InsecureVole> {
                     .map(|key| witness_com_f8b * key)
             })
             .collect::<Vec<_>>();
-        let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta)
+
+        let masked_witnesses = zip(self.partial_decommitment.witness_voles(), d_delta.clone())
             .map(|(qs, dds)| {
                 // NB: This unwrap is safe because we know the two input arrays are each exactly length 16.
                 let masked_witness: [F8b; 16] = zip(qs, dds)
@@ -264,14 +295,16 @@ impl Proof<InsecureVole> {
             })
             .collect::<Vec<_>>();
 
-        // Combine mask VOLEs to get q*
-        let validation_mask = combine(self.partial_decommitment.mask_voles());
+        // Output masked_witnesses values
 
-        // Run circuit traversal and get the aggregate value (part of c~)
+        // Combine mask VOLEs to get q* (step.5)
+        let validation_mask = combine(self.partial_decommitment.mask_voles()); // this point
+
+        // Run circuit traversal and get the aggregate value (part of c~) (step.6)
         let mut verifier_traverser = VerifierTraverser::new(
             self.witness_challenges.clone(),
             self.partial_decommitment.verifier_key(),
-            masked_witnesses,
+            masked_witnesses.clone(),
         )?;
         let reader = RelationReader::new(circuit)?;
         reader.read(&mut verifier_traverser)?;
@@ -280,13 +313,22 @@ impl Proof<InsecureVole> {
         // Finally, compute c~ = aggregate + q*
         let validation = validation_aggregate + validation_mask;
 
-        // Check the main constraint of the proof!!
+        // Check the main constraint of the proof!! (step.7)
         let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
             + self.degree_0_commitment;
         if validation != actual_validation {
             bail!("Verification failed: proof responses were not consistent with decommited VOLEs and masked witnesses");
         }
-        Ok(())
+
+        // Create and return the verification result with all the requested values
+        Ok(VerificationResult {
+            validation,
+            actual_validation,
+            d_delta,
+            masked_witnesses,
+            validation_mask,
+            validation_aggregate,
+        })
     }
 }
 
@@ -307,7 +349,94 @@ fn combine(values: [F128b; 128]) -> F128b {
     acc
 }
 
-#[cfg(test)]
+/// Serializable representation of the Proof struct for JSON serialization.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SerializableProof {
+    /// Base64-encoded VOLE challenge
+    pub vole_challenge: String,
+    /// Vector of base64-encoded witness commitment values
+    pub witness_commitment: Vec<String>,
+    /// Vector of base64-encoded witness challenge values
+    pub witness_challenges: Vec<String>,
+    /// Base64-encoded degree-0 commitment
+    pub degree_0_commitment: String,
+    /// Base64-encoded degree-1 commitment
+    pub degree_1_commitment: String,
+    /// Base64-encoded decommitment challenge
+    pub decommitment_challenge: String,
+    /// Serializable representation of the partial decommitment
+    pub partial_decommitment: SerializableDecommitment,
+}
+
+/// Serializable representation of the partial decommitment for JSON serialization.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct SerializableDecommitment {
+    /// Length of the extended witness
+    pub extended_witness_length: usize,
+    /// Vector of base64-encoded verifier key values
+    pub verifier_key: Vec<String>,
+    /// Matrix of base64-encoded verifier commitment values
+    pub verifier_commitments: Vec<Vec<String>>,
+}
+
+/// Convert a Proof to a SerializableProof for JSON serialization.
+///
+/// This function takes a Proof and converts it to a SerializableProof by
+/// base64-encoding all binary data to ensure it can be properly represented in JSON.
+pub fn to_serializable_proof(
+    proof: &Proof<crate::vole::insecure::InsecureVole>,
+) -> SerializableProof {
+    use swanky_serialization::CanonicalSerialize;
+
+    // Convert binary data to base64 strings
+    let vole_challenge = base64::encode(&proof.vole_challenge);
+
+    let witness_commitment = proof
+        .witness_commitment
+        .iter()
+        .map(|w| base64::encode(&w.to_bytes()))
+        .collect();
+
+    let witness_challenges = proof
+        .witness_challenges
+        .iter()
+        .map(|c| base64::encode(&c.to_bytes()))
+        .collect();
+
+    let degree_0_commitment = base64::encode(&proof.degree_0_commitment.to_bytes());
+    let degree_1_commitment = base64::encode(&proof.degree_1_commitment.to_bytes());
+    let decommitment_challenge = base64::encode(&proof.decommitment_challenge);
+
+    // Convert partial decommitment
+    let verifier_key = proof
+        .partial_decommitment
+        .verifier_key_array()
+        .iter()
+        .map(|k| base64::encode(&k.to_bytes()))
+        .collect();
+
+    let verifier_commitments = proof
+        .partial_decommitment
+        .witness_voles()
+        .iter()
+        .map(|vole| vole.iter().map(|v| base64::encode(&v.to_bytes())).collect())
+        .collect();
+
+    SerializableProof {
+        vole_challenge,
+        witness_commitment,
+        witness_challenges,
+        degree_0_commitment,
+        degree_1_commitment,
+        decommitment_challenge,
+        partial_decommitment: SerializableDecommitment {
+            extended_witness_length: proof.partial_decommitment.extended_witness_length(),
+            verifier_key,
+            verifier_commitments,
+        },
+    }
+}
+
 mod tests {
     use std::{fs::File, io::Cursor};
 
@@ -315,14 +444,17 @@ mod tests {
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use merlin::Transcript;
     use rand::thread_rng;
+    use serde::{Deserialize, Serialize};
     use std::io::Write;
+    use std::path::Path;
     use swanky_field::FiniteRing;
-    use swanky_field_binary::F128b;
+    use swanky_field_binary::{F128b, F64b, F8b};
+
     use tempfile::tempdir;
 
     use crate::vole::insecure::InsecureVole;
 
-    use super::Proof;
+    use super::{to_serializable_proof, Proof, SerializableDecommitment, SerializableProof};
 
     #[test]
     fn header_cannot_include_plugins() {
@@ -461,6 +593,7 @@ mod tests {
             @end";
 
         let (proof, mut mini_circuit) = create_proof(mini_circuit_bytes, private_input_bytes);
+        // Just check if verification succeeds, we don't need to access the result fields
         assert!(proof?.verify(&mut mini_circuit, &mut transcript()).is_ok());
 
         Ok(())
@@ -468,7 +601,7 @@ mod tests {
 
     const SMALL_CIRCUIT: &str = "version 2.0.0;
         circuit;
-        @type field 18446744073709551616;
+        @type field 2;
         @begin
           $0 ... $4 <- @private(0);
           $5 <- @add(0: $0, $0);
@@ -496,8 +629,19 @@ mod tests {
                 < 0 >;
             @end ";
 
-        let (proof, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
-        assert!(proof?.verify(&mut small_circuit, &mut transcript()).is_ok());
+        let (proof_result, mut small_circuit) = create_proof(SMALL_CIRCUIT, private_input_bytes);
+
+        // Unwrap the proof result
+        let proof = proof_result?;
+
+        // Serialize and save the proof to a JSON file
+        let serializable_proof = super::to_serializable_proof(&proof);
+        let proof_json = serde_json::to_string_pretty(&serializable_proof)?;
+        std::fs::write("proof.json", proof_json)?;
+
+        // Verify the proof
+        // Just check if verification succeeds, we don't need to access the result fields
+        assert!(proof.verify(&mut small_circuit, &mut transcript()).is_ok());
 
         Ok(())
     }
@@ -522,6 +666,7 @@ mod tests {
         // If we use a different transcript to verify, it'll fail
         let transcript = &mut transcript();
         transcript.append_message(b"I am but a simple verifier", b"trying to be secure");
+        // Just check if verification fails with different transcript
         assert!(proof?.verify(&mut small_circuit, transcript).is_err());
 
         Ok(())
@@ -577,6 +722,7 @@ mod tests {
         too_many_challenges
             .witness_challenges
             .push(F128b::random(rng));
+        // Just check if verification fails with too many challenges
         assert!(too_many_challenges
             .verify(&mut small_circuit.clone(), &mut transcript())
             .is_err());
@@ -584,6 +730,7 @@ mod tests {
         // Not having enough challenges should fail
         let mut too_few_challenges = proof.clone();
         too_few_challenges.witness_challenges.pop();
+        // Just check if verification fails with too few challenges
         assert!(too_few_challenges
             .verify(small_circuit, &mut transcript())
             .is_err());

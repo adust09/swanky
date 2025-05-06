@@ -1,0 +1,6 @@
+/target
+/solidity_output
+proof.json
+circuit.json
+schmivitz_proof.json
+test_circuit.json
