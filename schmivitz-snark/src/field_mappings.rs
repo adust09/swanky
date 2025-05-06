@@ -24,15 +24,25 @@ pub fn f8b_to_boolean_array<F: Field>(
     cs: ConstraintSystemRef<F>,
     value: &F8b,
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
+    // Get the bytes representation, handling potential missing assignments
     let bytes = value.to_bytes();
     let mut bits = Vec::with_capacity(8);
 
     // Extract 8 bits from the first byte
     for i in 0..8 {
         let bit = (bytes[0] >> i) & 1 == 1;
+
+        // Create a witness variable with proper error handling for missing assignments
         bits.push(Boolean::new_witness(
             ark_relations::ns!(cs, "f8b_bit"),
-            || Ok(bit),
+            || {
+                // Check if the value is valid, otherwise return AssignmentMissing
+                if bytes.is_empty() {
+                    Err(SynthesisError::AssignmentMissing)
+                } else {
+                    Ok(bit)
+                }
+            },
         )?);
     }
 
@@ -57,16 +67,31 @@ pub fn f64b_to_boolean_array<F: Field>(
     cs: ConstraintSystemRef<F>,
     value: &F64b,
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
+    // Get the bytes representation, handling potential missing assignments
     let bytes = value.to_bytes();
     let mut bits = Vec::with_capacity(64);
 
     // Extract 64 bits from the bytes (8 bytes)
     for byte_idx in 0..8 {
         for bit_idx in 0..8 {
-            let bit = (bytes[byte_idx] >> bit_idx) & 1 == 1;
+            // Check if the byte index is valid
+            let bit = if byte_idx < bytes.len() {
+                (bytes[byte_idx] >> bit_idx) & 1 == 1
+            } else {
+                false
+            };
+
+            // Create a witness variable with proper error handling for missing assignments
             bits.push(Boolean::new_witness(
                 ark_relations::ns!(cs, "f64b_bit"),
-                || Ok(bit),
+                || {
+                    // Check if the value is valid, otherwise return AssignmentMissing
+                    if byte_idx >= bytes.len() {
+                        Err(SynthesisError::AssignmentMissing)
+                    } else {
+                        Ok(bit)
+                    }
+                },
             )?);
         }
     }
@@ -92,16 +117,31 @@ pub fn f128b_to_boolean_array<F: Field>(
     cs: ConstraintSystemRef<F>,
     value: &F128b,
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {
+    // Get the bytes representation, handling potential missing assignments
     let bytes = value.to_bytes();
     let mut bits = Vec::with_capacity(128);
 
     // Extract 128 bits from the bytes (16 bytes)
     for byte_idx in 0..16 {
         for bit_idx in 0..8 {
-            let bit = (bytes[byte_idx] >> bit_idx) & 1 == 1;
+            // Check if the byte index is valid
+            let bit = if byte_idx < bytes.len() {
+                (bytes[byte_idx] >> bit_idx) & 1 == 1
+            } else {
+                false
+            };
+
+            // Create a witness variable with proper error handling for missing assignments
             bits.push(Boolean::new_witness(
                 ark_relations::ns!(cs, "f128b_bit"),
-                || Ok(bit),
+                || {
+                    // Check if the value is valid, otherwise return AssignmentMissing
+                    if byte_idx >= bytes.len() {
+                        Err(SynthesisError::AssignmentMissing)
+                    } else {
+                        Ok(bit)
+                    }
+                },
             )?);
         }
     }
@@ -211,7 +251,10 @@ pub fn boolean_array_to_f128b<F: Field>(bits: &[Boolean<F>]) -> Result<F128b, Sy
 
 #[cfg(test)]
 mod boolean_conversion_tests {
+    use std::iter::zip;
+
     use super::*;
+    use ark_r1cs_std::ToBitsGadget;
     use ark_relations::r1cs::ConstraintSystem;
     use swanky_field_binary::F8b;
 
@@ -325,6 +368,481 @@ mod boolean_conversion_tests {
 
         // Verify the result
         assert_eq!(f8b_xor, expected_xor);
+    }
+    #[test]
+    fn test_f8b_addition() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f8b_a = F8b::from(0x0Fu8); // 00001111
+        let f8b_b = F8b::from(0x33u8); // 00110011
+
+        // Expected result of addition in GF(2^8): 00111100 = 0x3C
+        // In binary fields, addition is XOR
+        let expected_sum = F8b::from(0x3Cu8);
+
+        // Direct field addition
+        let direct_sum = f8b_a + f8b_b;
+        assert_eq!(direct_sum, expected_sum);
+
+        // Addition through boolean arrays
+        let bits_a = f8b_to_boolean_array(cs.clone(), &f8b_a).unwrap();
+        let bits_b = f8b_to_boolean_array(cs.clone(), &f8b_b).unwrap();
+
+        // Perform addition (XOR) operation bit by bit
+        let mut sum_bits = Vec::with_capacity(8);
+        for i in 0..8 {
+            sum_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F8b
+        let boolean_sum = boolean_array_to_f8b(&sum_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_sum, expected_sum);
+        assert_eq!(boolean_sum, direct_sum);
+    }
+
+    #[test]
+    fn test_f8b_subtraction() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f8b_a = F8b::from(0x0Fu8); // 00001111
+        let f8b_b = F8b::from(0x33u8); // 00110011
+
+        // In binary fields, subtraction is the same as addition (XOR)
+        // Expected result: 00111100 = 0x3C
+        let expected_diff = F8b::from(0x3Cu8);
+
+        // Direct field subtraction
+        let direct_diff = f8b_a - f8b_b;
+        assert_eq!(direct_diff, expected_diff);
+
+        // Subtraction through boolean arrays (same as addition/XOR in binary fields)
+        let bits_a = f8b_to_boolean_array(cs.clone(), &f8b_a).unwrap();
+        let bits_b = f8b_to_boolean_array(cs.clone(), &f8b_b).unwrap();
+
+        // Perform subtraction (XOR) operation bit by bit
+        let mut diff_bits = Vec::with_capacity(8);
+        for i in 0..8 {
+            diff_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F8b
+        let boolean_diff = boolean_array_to_f8b(&diff_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_diff, expected_diff);
+        assert_eq!(boolean_diff, direct_diff);
+
+        // Verify that addition and subtraction are the same in binary fields
+        assert_eq!(direct_diff, f8b_a + f8b_b);
+    }
+
+    #[test]
+    fn test_f8b_multiplication() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f8b_a = F8b::from(0x0Fu8); // 00001111
+        let f8b_b = F8b::from(0x33u8); // 00110011
+
+        // Expected result of multiplication in GF(2^8): 00000011 = 0x03
+        // In binary fields, multiplication is AND
+        let expected_product = F8b::from(0x03u8);
+
+        // Direct field multiplication
+        let direct_product = f8b_a * f8b_b;
+        assert_eq!(direct_product, expected_product);
+
+        // Multiplication through boolean arrays
+        let bits_a = f8b_to_boolean_array(cs.clone(), &f8b_a).unwrap();
+        let bits_b = f8b_to_boolean_array(cs.clone(), &f8b_b).unwrap();
+
+        // Perform multiplication (AND) operation bit by bit
+        let mut product_bits = Vec::with_capacity(8);
+        for i in 0..8 {
+            product_bits.push(Boolean::and(&bits_a[i], &bits_b[i]).unwrap());
+        }
+
+        // Convert back to F8b
+        let boolean_product = boolean_array_to_f8b(&product_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_product, expected_product);
+        assert_eq!(boolean_product, direct_product);
+    }
+
+    #[test]
+    fn test_f64b_addition() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f64b_a = F64b::from(0x0F0F0F0F0F0F0F0Fu64);
+        let f64b_b = F64b::from(0x3333333333333333u64);
+
+        // Expected result of addition in GF(2^64)
+        // In binary fields, addition is XOR
+        let expected_sum = F64b::from(0x3C3C3C3C3C3C3C3Cu64);
+
+        // Direct field addition
+        let direct_sum = f64b_a + f64b_b;
+        assert_eq!(direct_sum, expected_sum);
+
+        // Addition through boolean arrays
+        let bits_a = f64b_to_boolean_array(cs.clone(), &f64b_a).unwrap();
+        let bits_b = f64b_to_boolean_array(cs.clone(), &f64b_b).unwrap();
+
+        // Perform addition (XOR) operation bit by bit
+        let mut sum_bits = Vec::with_capacity(64);
+        for i in 0..64 {
+            sum_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F64b
+        let boolean_sum = boolean_array_to_f64b(&sum_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_sum, expected_sum);
+        assert_eq!(boolean_sum, direct_sum);
+    }
+
+    #[test]
+    fn test_f64b_subtraction() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f64b_a = F64b::from(0x0F0F0F0F0F0F0F0Fu64);
+        let f64b_b = F64b::from(0x3333333333333333u64);
+
+        // In binary fields, subtraction is the same as addition (XOR)
+        let expected_diff = F64b::from(0x3C3C3C3C3C3C3C3Cu64);
+
+        // Direct field subtraction
+        let direct_diff = f64b_a - f64b_b;
+        assert_eq!(direct_diff, expected_diff);
+
+        // Subtraction through boolean arrays (same as addition/XOR in binary fields)
+        let bits_a = f64b_to_boolean_array(cs.clone(), &f64b_a).unwrap();
+        let bits_b = f64b_to_boolean_array(cs.clone(), &f64b_b).unwrap();
+
+        // Perform subtraction (XOR) operation bit by bit
+        let mut diff_bits = Vec::with_capacity(64);
+        for i in 0..64 {
+            diff_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F64b
+        let boolean_diff = boolean_array_to_f64b(&diff_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_diff, expected_diff);
+        assert_eq!(boolean_diff, direct_diff);
+
+        // Verify that addition and subtraction are the same in binary fields
+        assert_eq!(direct_diff, f64b_a + f64b_b);
+    }
+
+    #[test]
+    fn test_f64b_multiplication() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Test values
+        let f64b_a = F64b::from(0x0F0F0F0F0F0F0F0Fu64);
+        let f64b_b = F64b::from(0x3333333333333333u64);
+
+        // Expected result of multiplication in GF(2^64): 0x0303030303030303
+        // In binary fields, multiplication is AND
+        let expected_product = F64b::from(0x0303030303030303u64);
+
+        // Direct field multiplication
+        let direct_product = f64b_a * f64b_b;
+        assert_eq!(direct_product, expected_product);
+
+        // Multiplication through boolean arrays
+        let bits_a = f64b_to_boolean_array(cs.clone(), &f64b_a).unwrap();
+        let bits_b = f64b_to_boolean_array(cs.clone(), &f64b_b).unwrap();
+
+        // Perform multiplication (AND) operation bit by bit
+        let mut product_bits = Vec::with_capacity(64);
+        for i in 0..64 {
+            product_bits.push(Boolean::and(&bits_a[i], &bits_b[i]).unwrap());
+        }
+
+        // Convert back to F64b
+        let boolean_product = boolean_array_to_f64b(&product_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_product, expected_product);
+        assert_eq!(boolean_product, direct_product);
+    }
+
+    #[test]
+    fn test_f128b_addition() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Create test values for F128b
+        let mut bytes_a = [0u8; 16];
+        bytes_a[0] = 0x0F; // Lower bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[1] = 0x0F;
+        bytes_a[2] = 0x0F;
+        bytes_a[3] = 0x0F;
+        bytes_a[4] = 0x0F;
+        bytes_a[5] = 0x0F;
+        bytes_a[6] = 0x0F;
+        bytes_a[7] = 0x0F;
+        bytes_a[8] = 0x0F; // Upper bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[9] = 0x0F;
+        bytes_a[10] = 0x0F;
+        bytes_a[11] = 0x0F;
+        bytes_a[12] = 0x0F;
+        bytes_a[13] = 0x0F;
+        bytes_a[14] = 0x0F;
+        bytes_a[15] = 0x0F;
+
+        let mut bytes_b = [0u8; 16];
+        bytes_b[0] = 0x33; // Lower bits pattern: 0x3333333333333333
+        bytes_b[1] = 0x33;
+        bytes_b[2] = 0x33;
+        bytes_b[3] = 0x33;
+        bytes_b[4] = 0x33;
+        bytes_b[5] = 0x33;
+        bytes_b[6] = 0x33;
+        bytes_b[7] = 0x33;
+        bytes_b[8] = 0x33; // Upper bits pattern: 0x3333333333333333
+        bytes_b[9] = 0x33;
+        bytes_b[10] = 0x33;
+        bytes_b[11] = 0x33;
+        bytes_b[12] = 0x33;
+        bytes_b[13] = 0x33;
+        bytes_b[14] = 0x33;
+        bytes_b[15] = 0x33;
+
+        let mut expected_bytes = [0u8; 16];
+        expected_bytes[0] = 0x3C; // Expected pattern: 0x3C3C3C3C3C3C3C3C
+        expected_bytes[1] = 0x3C;
+        expected_bytes[2] = 0x3C;
+        expected_bytes[3] = 0x3C;
+        expected_bytes[4] = 0x3C;
+        expected_bytes[5] = 0x3C;
+        expected_bytes[6] = 0x3C;
+        expected_bytes[7] = 0x3C;
+        expected_bytes[8] = 0x3C; // Expected pattern: 0x3C3C3C3C3C3C3C3C
+        expected_bytes[9] = 0x3C;
+        expected_bytes[10] = 0x3C;
+        expected_bytes[11] = 0x3C;
+        expected_bytes[12] = 0x3C;
+        expected_bytes[13] = 0x3C;
+        expected_bytes[14] = 0x3C;
+        expected_bytes[15] = 0x3C;
+
+        let f128b_a = F128b::from_uniform_bytes(&bytes_a);
+        let f128b_b = F128b::from_uniform_bytes(&bytes_b);
+        let expected_sum = F128b::from_uniform_bytes(&expected_bytes);
+
+        // Direct field addition
+        let direct_sum = f128b_a + f128b_b;
+        assert_eq!(direct_sum, expected_sum);
+
+        // Addition through boolean arrays
+        let bits_a = f128b_to_boolean_array(cs.clone(), &f128b_a).unwrap();
+        let bits_b = f128b_to_boolean_array(cs.clone(), &f128b_b).unwrap();
+
+        // Perform addition (XOR) operation bit by bit
+        let mut sum_bits = Vec::with_capacity(128);
+        for i in 0..128 {
+            sum_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F128b
+        let boolean_sum = boolean_array_to_f128b(&sum_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_sum, expected_sum);
+        assert_eq!(boolean_sum, direct_sum);
+    }
+
+    #[test]
+    fn test_f128b_subtraction() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Create test values for F128b (same as in addition test)
+        let mut bytes_a = [0u8; 16];
+        bytes_a[0] = 0x0F; // Lower bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[1] = 0x0F;
+        bytes_a[2] = 0x0F;
+        bytes_a[3] = 0x0F;
+        bytes_a[4] = 0x0F;
+        bytes_a[5] = 0x0F;
+        bytes_a[6] = 0x0F;
+        bytes_a[7] = 0x0F;
+        bytes_a[8] = 0x0F; // Upper bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[9] = 0x0F;
+        bytes_a[10] = 0x0F;
+        bytes_a[11] = 0x0F;
+        bytes_a[12] = 0x0F;
+        bytes_a[13] = 0x0F;
+        bytes_a[14] = 0x0F;
+        bytes_a[15] = 0x0F;
+
+        let mut bytes_b = [0u8; 16];
+        bytes_b[0] = 0x33; // Lower bits pattern: 0x3333333333333333
+        bytes_b[1] = 0x33;
+        bytes_b[2] = 0x33;
+        bytes_b[3] = 0x33;
+        bytes_b[4] = 0x33;
+        bytes_b[5] = 0x33;
+        bytes_b[6] = 0x33;
+        bytes_b[7] = 0x33;
+        bytes_b[8] = 0x33; // Upper bits pattern: 0x3333333333333333
+        bytes_b[9] = 0x33;
+        bytes_b[10] = 0x33;
+        bytes_b[11] = 0x33;
+        bytes_b[12] = 0x33;
+        bytes_b[13] = 0x33;
+        bytes_b[14] = 0x33;
+        bytes_b[15] = 0x33;
+
+        let mut expected_bytes = [0u8; 16];
+        expected_bytes[0] = 0x3C; // Expected pattern: 0x3C3C3C3C3C3C3C3C
+        expected_bytes[1] = 0x3C;
+        expected_bytes[2] = 0x3C;
+        expected_bytes[3] = 0x3C;
+        expected_bytes[4] = 0x3C;
+        expected_bytes[5] = 0x3C;
+        expected_bytes[6] = 0x3C;
+        expected_bytes[7] = 0x3C;
+        expected_bytes[8] = 0x3C; // Expected pattern: 0x3C3C3C3C3C3C3C3C
+        expected_bytes[9] = 0x3C;
+        expected_bytes[10] = 0x3C;
+        expected_bytes[11] = 0x3C;
+        expected_bytes[12] = 0x3C;
+        expected_bytes[13] = 0x3C;
+        expected_bytes[14] = 0x3C;
+        expected_bytes[15] = 0x3C;
+
+        let f128b_a = F128b::from_uniform_bytes(&bytes_a);
+        let f128b_b = F128b::from_uniform_bytes(&bytes_b);
+        let expected_diff = F128b::from_uniform_bytes(&expected_bytes);
+
+        // Direct field subtraction
+        let direct_diff = f128b_a - f128b_b;
+        assert_eq!(direct_diff, expected_diff);
+
+        // Subtraction through boolean arrays
+        let bits_a = f128b_to_boolean_array(cs.clone(), &f128b_a).unwrap();
+        let bits_b = f128b_to_boolean_array(cs.clone(), &f128b_b).unwrap();
+
+        // Perform subtraction (XOR) operation bit by bit
+        let mut diff_bits = Vec::with_capacity(128);
+        for i in 0..128 {
+            diff_bits.push(bits_a[i].xor(&bits_b[i]).unwrap());
+        }
+
+        // Convert back to F128b
+        let boolean_diff = boolean_array_to_f128b(&diff_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_diff, expected_diff);
+        assert_eq!(boolean_diff, direct_diff);
+
+        // Verify that addition and subtraction are the same in binary fields
+        assert_eq!(direct_diff, f128b_a + f128b_b);
+    }
+
+    #[test]
+    fn test_f128b_multiplication() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Create test values for F128b
+        let mut bytes_a = [0u8; 16];
+        bytes_a[0] = 0x0F; // Lower bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[1] = 0x0F;
+        bytes_a[2] = 0x0F;
+        bytes_a[3] = 0x0F;
+        bytes_a[4] = 0x0F;
+        bytes_a[5] = 0x0F;
+        bytes_a[6] = 0x0F;
+        bytes_a[7] = 0x0F;
+        bytes_a[8] = 0x0F; // Upper bits pattern: 0x0F0F0F0F0F0F0F0F
+        bytes_a[9] = 0x0F;
+        bytes_a[10] = 0x0F;
+        bytes_a[11] = 0x0F;
+        bytes_a[12] = 0x0F;
+        bytes_a[13] = 0x0F;
+        bytes_a[14] = 0x0F;
+        bytes_a[15] = 0x0F;
+
+        let mut bytes_b = [0u8; 16];
+        bytes_b[0] = 0x33; // Lower bits pattern: 0x3333333333333333
+        bytes_b[1] = 0x33;
+        bytes_b[2] = 0x33;
+        bytes_b[3] = 0x33;
+        bytes_b[4] = 0x33;
+        bytes_b[5] = 0x33;
+        bytes_b[6] = 0x33;
+        bytes_b[7] = 0x33;
+        bytes_b[8] = 0x33; // Upper bits pattern: 0x3333333333333333
+        bytes_b[9] = 0x33;
+        bytes_b[10] = 0x33;
+        bytes_b[11] = 0x33;
+        bytes_b[12] = 0x33;
+        bytes_b[13] = 0x33;
+        bytes_b[14] = 0x33;
+        bytes_b[15] = 0x33;
+
+        let mut expected_bytes = [0u8; 16];
+        expected_bytes[0] = 0x03; // Expected pattern: 0x0303030303030303
+        expected_bytes[1] = 0x03;
+        expected_bytes[2] = 0x03;
+        expected_bytes[3] = 0x03;
+        expected_bytes[4] = 0x03;
+        expected_bytes[5] = 0x03;
+        expected_bytes[6] = 0x03;
+        expected_bytes[7] = 0x03;
+        expected_bytes[8] = 0x03; // Expected pattern: 0x0303030303030303
+        expected_bytes[9] = 0x03;
+        expected_bytes[10] = 0x03;
+        expected_bytes[11] = 0x03;
+        expected_bytes[12] = 0x03;
+        expected_bytes[13] = 0x03;
+        expected_bytes[14] = 0x03;
+        expected_bytes[15] = 0x03;
+
+        let f128b_a = F128b::from_uniform_bytes(&bytes_a);
+        let f128b_b = F128b::from_uniform_bytes(&bytes_b);
+        let expected_product = F128b::from_uniform_bytes(&expected_bytes);
+
+        // Direct field multiplication
+        let direct_product = f128b_a * f128b_b;
+        assert_eq!(direct_product, expected_product);
+
+        // Multiplication through boolean arrays
+        let bits_a = f128b_to_boolean_array(cs.clone(), &f128b_a).unwrap();
+        let bits_b = f128b_to_boolean_array(cs.clone(), &f128b_b).unwrap();
+
+        // Perform multiplication (AND) operation bit by bit
+        let mut product_bits = Vec::with_capacity(128);
+        for i in 0..128 {
+            product_bits.push(Boolean::and(&bits_a[i], &bits_b[i]).unwrap());
+        }
+
+        // Convert back to F128b
+        let boolean_product = boolean_array_to_f128b(&product_bits).unwrap();
+
+        // Verify both methods give the same result
+        assert_eq!(boolean_product, expected_product);
+        assert_eq!(boolean_product, direct_product);
     }
 }
 

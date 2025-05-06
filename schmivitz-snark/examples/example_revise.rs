@@ -169,14 +169,14 @@ fn build_circuit(
 
     // Build the circuit with boolean arrays
     let circuit = VoleVerificationBoolean {
-        witness_commitment: Some(witness_commitment_booleans),
-        witness_challenges: Some(witness_challenges_booleans),
-        degree_0_commitment: Some(degree_0_commitment_boolean),
-        degree_1_commitment: Some(degree_1_commitment_boolean),
+        witness_commitment: witness_commitment_booleans,
+        witness_challenges: witness_challenges_booleans,
+        degree_0_commitment: degree_0_commitment_boolean,
+        degree_1_commitment: degree_1_commitment_boolean,
         partial_decommitment: PartialDecommitmentBoolean {
-            verifier_key: Some(verifier_key_boolean),
-            mask_voles: Some(mask_voles_booleans),
-            witness_voles: Some(witness_voles_booleans),
+            verifier_key: verifier_key_boolean,
+            mask_voles: mask_voles_booleans,
+            witness_voles: witness_voles_booleans,
         },
     };
 

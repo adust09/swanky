@@ -12,7 +12,6 @@ pub use prover::{SnarkKeys, SnarkProof};
 // Re-export gadgets for use in other crates
 pub use gadgets::{CircuitTraverser, MaskedWitnessVar, TranscriptWrapper, WireId, WireRange};
 
-pub use constraints::{SchmivitzValues, VoleVerification};
 pub use constraints_revise::{PartialDecommitmentBoolean, VoleVerificationBoolean};
 
 // Re-export field conversion functions
@@ -29,4 +28,4 @@ pub use field_mappings::{
     // Boolean array conversion functions
     f8b_to_boolean_array,
 };
-pub use serializable::{save_variables_to_json, serialize_bn254fr_revised};
+pub use serializable::save_variables_to_json;
