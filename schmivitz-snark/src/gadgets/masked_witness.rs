@@ -370,10 +370,9 @@ impl MaskedWitnessVarRevised {
     /// ```
     #[tracing::instrument(
         target = "r1cs",
-        skip(cs, witness_commitment_booleans, verifier_key_booleans)
+        skip(witness_commitment_booleans, verifier_key_booleans)
     )]
     pub fn compute_d_delta(
-        cs: ConstraintSystemRef<Bn254Fr>,
         witness_commitment_booleans: &Vec<Vec<Boolean<Bn254Fr>>>,
         verifier_key_booleans: &Vec<Boolean<Bn254Fr>>,
     ) -> Result<Vec<Vec<Vec<Boolean<Bn254Fr>>>>, SynthesisError> {
@@ -691,21 +690,19 @@ impl MaskedWitnessVarRevised {
     #[tracing::instrument(
         target = "r1cs",
         skip(
-            cs,
             witness_commitment_booleans,
             verifier_key_booleans,
             witness_voles_booleans
         )
     )]
     pub fn compute(
-        cs: ConstraintSystemRef<Bn254Fr>,
         witness_commitment_booleans: &Vec<Vec<Boolean<Bn254Fr>>>,
         verifier_key_booleans: &Vec<Boolean<Bn254Fr>>,
         witness_voles_booleans: &Vec<Vec<Vec<Boolean<Bn254Fr>>>>,
     ) -> Result<Vec<Vec<Boolean<Bn254Fr>>>, SynthesisError> {
         // Step 1: Compute d_delta
         let d_delta_booleans =
-            Self::compute_d_delta(cs, witness_commitment_booleans, verifier_key_booleans)?;
+            Self::compute_d_delta(witness_commitment_booleans, verifier_key_booleans)?;
 
         // Step 2: Compute masked witnesses
         let masked_witnesses_booleans =
@@ -799,7 +796,7 @@ mod revised_tests {
         cs
     }
 
-    #[test]
+    // #[test]
     // fn test_compute_masked_witness_revise() {
     //     let cs = create_cs();
 
@@ -837,8 +834,6 @@ mod revised_tests {
     // }
     #[test]
     fn test_compute_validation_aggregate_revise() {
-        let cs = create_cs();
-
         // Create test witness challenges (Boolean arrays representing field elements)
         let witness_challenges = vec![
             vec![Boolean::constant(true), Boolean::constant(false)], // Represents 1
@@ -888,8 +883,6 @@ mod revised_tests {
 
     #[test]
     fn test_compute_d_delta() {
-        let cs = create_cs();
-
         // Create test witness commitment booleans
         let witness_commitment_booleans = vec![
             vec![Boolean::constant(true), Boolean::constant(false)],
@@ -901,7 +894,6 @@ mod revised_tests {
 
         // Compute d_delta
         let d_delta = MaskedWitnessVarRevised::compute_d_delta(
-            cs.clone(),
             &witness_commitment_booleans,
             &verifier_key_booleans,
         )
@@ -915,8 +907,6 @@ mod revised_tests {
 
     #[test]
     fn test_compute_masked_witness() {
-        let cs = create_cs();
-
         // Create test witness voles booleans
         let witness_voles_booleans = vec![vec![
             vec![Boolean::constant(true), Boolean::constant(false)],

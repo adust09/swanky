@@ -329,7 +329,6 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationBoolean {
     {
         // Step 1: Compute d_delta from witness commitment and verifier key
         let d_delta_var = MaskedWitnessVarRevised::compute_d_delta(
-            cs.clone(),
             &self.witness_commitment,
             &self.partial_decommitment.verifier_key.clone(),
         )?;
