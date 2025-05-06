@@ -348,95 +348,7 @@ fn combine(values: [F128b; 128]) -> F128b {
     }
     acc
 }
-
-/// Serializable representation of the Proof struct for JSON serialization.
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct SerializableProof {
-    /// Base64-encoded VOLE challenge
-    pub vole_challenge: String,
-    /// Vector of base64-encoded witness commitment values
-    pub witness_commitment: Vec<String>,
-    /// Vector of base64-encoded witness challenge values
-    pub witness_challenges: Vec<String>,
-    /// Base64-encoded degree-0 commitment
-    pub degree_0_commitment: String,
-    /// Base64-encoded degree-1 commitment
-    pub degree_1_commitment: String,
-    /// Base64-encoded decommitment challenge
-    pub decommitment_challenge: String,
-    /// Serializable representation of the partial decommitment
-    pub partial_decommitment: SerializableDecommitment,
-}
-
-/// Serializable representation of the partial decommitment for JSON serialization.
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct SerializableDecommitment {
-    /// Length of the extended witness
-    pub extended_witness_length: usize,
-    /// Vector of base64-encoded verifier key values
-    pub verifier_key: Vec<String>,
-    /// Matrix of base64-encoded verifier commitment values
-    pub verifier_commitments: Vec<Vec<String>>,
-}
-
-/// Convert a Proof to a SerializableProof for JSON serialization.
-///
-/// This function takes a Proof and converts it to a SerializableProof by
-/// base64-encoding all binary data to ensure it can be properly represented in JSON.
-pub fn to_serializable_proof(
-    proof: &Proof<crate::vole::insecure::InsecureVole>,
-) -> SerializableProof {
-    use swanky_serialization::CanonicalSerialize;
-
-    // Convert binary data to base64 strings
-    let vole_challenge = base64::encode(&proof.vole_challenge);
-
-    let witness_commitment = proof
-        .witness_commitment
-        .iter()
-        .map(|w| base64::encode(&w.to_bytes()))
-        .collect();
-
-    let witness_challenges = proof
-        .witness_challenges
-        .iter()
-        .map(|c| base64::encode(&c.to_bytes()))
-        .collect();
-
-    let degree_0_commitment = base64::encode(&proof.degree_0_commitment.to_bytes());
-    let degree_1_commitment = base64::encode(&proof.degree_1_commitment.to_bytes());
-    let decommitment_challenge = base64::encode(&proof.decommitment_challenge);
-
-    // Convert partial decommitment
-    let verifier_key = proof
-        .partial_decommitment
-        .verifier_key_array()
-        .iter()
-        .map(|k| base64::encode(&k.to_bytes()))
-        .collect();
-
-    let verifier_commitments = proof
-        .partial_decommitment
-        .witness_voles()
-        .iter()
-        .map(|vole| vole.iter().map(|v| base64::encode(&v.to_bytes())).collect())
-        .collect();
-
-    SerializableProof {
-        vole_challenge,
-        witness_commitment,
-        witness_challenges,
-        degree_0_commitment,
-        degree_1_commitment,
-        decommitment_challenge,
-        partial_decommitment: SerializableDecommitment {
-            extended_witness_length: proof.partial_decommitment.extended_witness_length(),
-            verifier_key,
-            verifier_commitments,
-        },
-    }
-}
-
+#[cfg(test)]
 mod tests {
     use std::{fs::File, io::Cursor};
 
@@ -444,17 +356,15 @@ mod tests {
     use mac_n_cheese_sieve_parser::text_parser::RelationReader;
     use merlin::Transcript;
     use rand::thread_rng;
-    use serde::{Deserialize, Serialize};
     use std::io::Write;
-    use std::path::Path;
     use swanky_field::FiniteRing;
-    use swanky_field_binary::{F128b, F64b, F8b};
+    use swanky_field_binary::F128b;
 
     use tempfile::tempdir;
 
     use crate::vole::insecure::InsecureVole;
 
-    use super::{to_serializable_proof, Proof, SerializableDecommitment, SerializableProof};
+    use super::Proof;
 
     #[test]
     fn header_cannot_include_plugins() {
@@ -633,12 +543,6 @@ mod tests {
 
         // Unwrap the proof result
         let proof = proof_result?;
-
-        // Serialize and save the proof to a JSON file
-        let serializable_proof = super::to_serializable_proof(&proof);
-        let proof_json = serde_json::to_string_pretty(&serializable_proof)?;
-        std::fs::write("proof.json", proof_json)?;
-
         // Verify the proof
         // Just check if verification succeeds, we don't need to access the result fields
         assert!(proof.verify(&mut small_circuit, &mut transcript()).is_ok());

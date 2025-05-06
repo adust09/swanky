@@ -9,7 +9,6 @@ use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, Proof};
-// Import the boolean array conversion functions
 use schmivitz_snark::{
     constraints::{PartialDecommitmentBoolean, VoleVerificationBoolean},
     f128b_to_boolean_array, f64b_to_boolean_array, f8b_to_boolean_array,
