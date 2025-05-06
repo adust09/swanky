@@ -595,17 +595,14 @@ impl MaskedWitnessVarRevised {
         //     acc
         // }
 
-        println!("hoge");
         // Get the generator as a boolean array
         let generator_booleans = f128b_to_boolean_array(cs.clone(), &F128b::GENERATOR)?;
-        println!("hoge");
 
         // Initialize accumulator with zeros (F128b::ZERO)
         let mut acc_bits = Vec::with_capacity(128);
         for _ in 0..128 {
             acc_bits.push(Boolean::constant(false));
         }
-        println!("hoge");
 
         // Initialize power with ONE (F128b::ONE)
         let mut power_bits = Vec::with_capacity(128);

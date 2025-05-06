@@ -1,5 +1,4 @@
 pub mod constraints;
-pub mod constraints_revise;
 mod field_mappings;
 mod gadgets;
 mod prover;
@@ -12,7 +11,7 @@ pub use prover::{SnarkKeys, SnarkProof};
 // Re-export gadgets for use in other crates
 pub use gadgets::{CircuitTraverser, MaskedWitnessVar, TranscriptWrapper, WireId, WireRange};
 
-pub use constraints_revise::{PartialDecommitmentBoolean, VoleVerificationBoolean};
+pub use constraints::{PartialDecommitmentBoolean, VoleVerificationBoolean};
 
 // Re-export field conversion functions
 pub use field_mappings::{
