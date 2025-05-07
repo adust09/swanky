@@ -4,9 +4,10 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_ff::PrimeField;
 use ark_r1cs_std::{boolean::Boolean, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use schmivitz::{insecure::InsecureVole, Proof};
 
-use crate::gadgets::MaskedWitnessVar;
-use crate::gadgets::ValidationVar;
+use crate::{f128b_to_boolean_array, f8b_to_boolean_array, gadgets::ValidationVar};
+use crate::{f64b_to_boolean_array, gadgets::MaskedWitnessVar};
 
 #[derive(Debug, Clone)]
 pub struct VoleVerificationBoolean {
@@ -68,4 +69,74 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationBoolean {
 
         Ok(())
     }
+}
+
+pub fn build_circuit(
+    cs: ark_relations::r1cs::ConstraintSystemRef<Bn254Fr>,
+    schmivitz_proof: Proof<InsecureVole>,
+) -> VoleVerificationBoolean {
+    // Convert binary field elements to boolean arrays
+
+    // Convert witness commitment (F64b) to boolean arrays
+    let witness_commitment_booleans: Vec<Vec<Boolean<Bn254Fr>>> = schmivitz_proof
+        .witness_commitment
+        .iter()
+        .map(|value| f64b_to_boolean_array(cs.clone(), value).unwrap())
+        .collect();
+
+    // Convert witness challenges (F128b) to boolean arrays
+    let witness_challenges_booleans: Vec<Vec<Boolean<Bn254Fr>>> = schmivitz_proof
+        .witness_challenges
+        .iter()
+        .map(|value| f128b_to_boolean_array(cs.clone(), value).unwrap())
+        .collect();
+
+    // Convert degree commitments to boolean arrays
+    let degree_0_commitment_boolean =
+        f128b_to_boolean_array(cs.clone(), &schmivitz_proof.degree_0_commitment).unwrap();
+
+    let degree_1_commitment_boolean =
+        f128b_to_boolean_array(cs.clone(), &schmivitz_proof.degree_1_commitment).unwrap();
+
+    // Convert verifier key to boolean array
+    let verifier_key_boolean = f128b_to_boolean_array(
+        cs.clone(),
+        &schmivitz_proof.partial_decommitment.verifier_key(),
+    )
+    .unwrap();
+
+    // Process mask voles using boolean arrays
+    let mask_voles_booleans: Vec<Vec<Boolean<Bn254Fr>>> = schmivitz_proof
+        .partial_decommitment
+        .mask_voles()
+        .iter()
+        .map(|value| f128b_to_boolean_array(cs.clone(), value).unwrap())
+        .collect();
+
+    // Process witness voles using boolean arrays
+    let mut witness_voles_booleans = Vec::new();
+    for arr in schmivitz_proof.partial_decommitment.witness_voles() {
+        // Convert each F8b value to boolean array
+        let arr_booleans: Vec<Vec<Boolean<Bn254Fr>>> = arr
+            .iter()
+            .map(|value| f8b_to_boolean_array(cs.clone(), value).unwrap())
+            .collect();
+
+        witness_voles_booleans.push(arr_booleans);
+    }
+
+    // Build the circuit with boolean arrays
+    let circuit = VoleVerificationBoolean {
+        witness_commitment: witness_commitment_booleans,
+        witness_challenges: witness_challenges_booleans,
+        degree_0_commitment: degree_0_commitment_boolean,
+        degree_1_commitment: degree_1_commitment_boolean,
+        partial_decommitment: PartialDecommitmentBoolean {
+            verifier_key: verifier_key_boolean,
+            mask_voles: mask_voles_booleans,
+            witness_voles: witness_voles_booleans,
+        },
+    };
+
+    circuit
 }

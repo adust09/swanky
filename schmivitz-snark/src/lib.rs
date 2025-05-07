@@ -1,8 +1,7 @@
 pub mod constraints;
 mod field_mappings;
 mod gadgets;
-#[cfg(test)]
-pub use constraints::{PartialDecommitmentBoolean, VoleVerificationBoolean};
+pub use constraints::{build_circuit, PartialDecommitmentBoolean, VoleVerificationBoolean};
 
 // Re-export field conversion functions
 pub use field_mappings::{
