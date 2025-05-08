@@ -22,35 +22,12 @@ fn main() -> Result<()> {
     layer.mode = TracingMode::OnlyConstraints;
     let subscriber = tracing_subscriber::Registry::default().with(layer);
     let _guard = tracing::subscriber::set_default(subscriber);
-    // target circuit
-    let circuit_str = "version 2.0.0;
-        circuit;
-        @type field 2;
-        @begin
-            $0 ... $4 <- @private(0);
-            $5 <- @add(0: $0, $0);
-            $6 <- @add(0: $0, $1);
-            $7 <- @add(0: $0, $2);
-            $8 <- @add(0: $0, $3);
-            $9 <- @add(0: $0, $4);
-            $10 <- @mul(0: $0, $5);
-            $11 <- @mul(0: $0, $6);
-            $12 <- @mul(0: $0, $7);
-            $13 <- @mul(0: $0, $8);
-            $14 <- @mul(0: $0, $9);
-        @end ";
+    // target circuit - read from circuit.txt
+    let circuit_str = fs::read_to_string("schmivitz-snark/examples/circuit.txt")?;
     let circuit = Cursor::new(circuit_str.as_bytes());
 
-    let private_input_bytes = "version 2.0.0;
-        private_input;
-        @type field 2;
-        @begin
-            < 1 >;
-            < 1 >;
-            < 1 >;
-            < 0 >;
-            < 0 >;
-        @end";
+    // read private input from private.txt
+    let private_input_bytes = fs::read_to_string("schmivitz-snark/examples/private.txt")?;
 
     let dir = tempdir().unwrap();
     let private_input_path = dir.path().join("private_inputs");
@@ -72,14 +49,18 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
+    println!("hoge");
+
     // Create a constraint system for boolean conversions
     let cs = ConstraintSystem::<Bn254Fr>::new_ref();
 
     // Build the circuit using boolean arrays
     let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
+    println!("hoge");
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
+    println!("hoge");
 
     let solidity_verifier = Groth16::<Bn254>::export(&vk);
     let output_dir = Path::new("solidity_output");

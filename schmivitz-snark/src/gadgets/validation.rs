@@ -64,7 +64,6 @@ impl ValidationVar {
                 acc_bits[i] = Boolean::xor(&acc_bits[i], &product_bits[i])?;
             }
         }
-        println!("mask_voles_booleans");
 
         Ok(acc_bits)
     }
