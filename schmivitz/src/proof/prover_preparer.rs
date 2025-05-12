@@ -382,6 +382,26 @@ mod tests {
     }
 
     #[test]
+    fn addc_gates_eval_correctly() -> eyre::Result<()> {
+        let one_add = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 <- @private(0);
+              $1 <- @addc(0: $0, < 1 >);
+            @end ";
+
+        // This evaluates on a random input; over time we'll check them all
+        let counter = prepare_circuit(one_add)?;
+        assert_eq!(
+            counter.wire_values[&0] + counter.wire_values[&1],
+            counter.wire_values[&2]
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn mul_gates_eval_correctly() -> eyre::Result<()> {
         let one_mul = "version 2.0.0;
             circuit;

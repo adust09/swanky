@@ -214,9 +214,11 @@ impl FunctionBodyVisitor for VerifierTraverser {
     fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
-
+        let maybe_f2: Option<F2> = F2::try_from_int(*right).into();
+        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+        let f128b = F128b::from(f2);
         // Compute the correct masked witness for the output wire
-        self.save_computed_masked_witness(dst, self.masked_witness(left)? + right.as_u64()?)
+        self.save_computed_masked_witness(dst, self.masked_witness(left)? + f128b)
     }
 
     fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {

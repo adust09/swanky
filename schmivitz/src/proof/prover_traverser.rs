@@ -5,7 +5,7 @@ use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
-use swanky_field::{FiniteRing, IsSubFieldOf};
+use swanky_field::{FiniteRing, IsSubFieldOf, PrimeFiniteField};
 use swanky_field_binary::{F128b, F64b, F2};
 
 use crate::vole::RandomVole;
@@ -271,9 +271,11 @@ impl<Vole: RandomVole> FunctionBodyVisitor for ProverTraverser<Vole> {
     fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> Result<()> {
         // Assumption: There is exactly one type ID for these circuits and it is F2.
         assert_eq!(ty, 0);
-
+        let maybe_f2: Option<F2> = F2::try_from_int(*right).into();
+        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+        let f128b = F128b::from(f2);
         // Compute the correct VOLE for the output wire
-        let sum_vole = self.vole(left)? + self.vole(right)?;
+        let sum_vole = self.vole(left)? + f128b;
         self.save_computed_vole(dst, sum_vole)
 
         // Linear gates don't contribute to the aggregated values being computed
