@@ -5,8 +5,8 @@ use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
-use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
+use swanky_field::{FiniteRing, PrimeFiniteField};
+use swanky_field_binary::{F128b, F64b, F2};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
@@ -211,8 +211,12 @@ impl FunctionBodyVisitor for VerifierTraverser {
         Ok(())
     }
 
-    fn addc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+
+        // Compute the correct masked witness for the output wire
+        self.save_computed_masked_witness(dst, self.masked_witness(left)? + right.as_u64()?)
     }
 
     fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
