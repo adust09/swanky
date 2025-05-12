@@ -6,7 +6,7 @@ use mac_n_cheese_sieve_parser::{
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
 use swanky_field::{FiniteRing, PrimeFiniteField};
-use swanky_field_binary::{F128b, F64b, F2};
+use swanky_field_binary::{F128b, F2};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
