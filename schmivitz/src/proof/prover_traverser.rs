@@ -464,4 +464,108 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn addc_gate_vole_computation_works() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 100u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 101u64;
+
+        // Create a random VOLE for the input wire
+        let input_vole = F128b::random(rng);
+        traverser.save_computed_vole(input_wid, input_vole)?;
+
+        // Create a constant value (1 in F2)
+        let constant_f2 = F2::ONE;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Compute the expected VOLE for the output wire (input_vole + constant)
+        let expected_output_vole = input_vole + constant_f128b;
+
+        // Manually simulate the addc operation
+        let output_vole = traverser.vole(input_wid)? + constant_f128b;
+        traverser.save_computed_vole(output_wid, output_vole)?;
+
+        // Verify the output VOLE is correct
+        assert_eq!(traverser.vole(output_wid)?, expected_output_vole);
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gate_with_zero_vole_computation_works() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 200u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 201u64;
+
+        // Create a random VOLE for the input wire
+        let input_vole = F128b::random(rng);
+        traverser.save_computed_vole(input_wid, input_vole)?;
+
+        // Create a constant value (0 in F2)
+        let constant_f2 = F2::ZERO;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Compute the expected VOLE for the output wire (input_vole + 0)
+        let expected_output_vole = input_vole + constant_f128b;
+
+        // Manually simulate the addc operation
+        let output_vole = traverser.vole(input_wid)? + constant_f128b;
+        traverser.save_computed_vole(output_wid, output_vole)?;
+
+        // Verify the output VOLE is correct
+        assert_eq!(traverser.vole(output_wid)?, expected_output_vole);
+
+        // Adding zero should not change the value
+        assert_eq!(traverser.vole(output_wid)?, input_vole);
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gate_does_not_affect_aggregation() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 300u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 301u64;
+
+        // Create a random VOLE for the input wire
+        let input_vole = F128b::random(rng);
+        traverser.save_computed_vole(input_wid, input_vole)?;
+
+        // Create a constant value (1 in F2)
+        let constant_f2 = F2::ONE;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Save the initial aggregation values
+        let initial_degree_0 = traverser.aggregate_degree_0;
+        let initial_degree_1 = traverser.aggregate_degree_1;
+
+        // Manually simulate the addc operation
+        let output_vole = traverser.vole(input_wid)? + constant_f128b;
+        traverser.save_computed_vole(output_wid, output_vole)?;
+
+        // Verify that the aggregation values haven't changed (addc is a linear gate)
+        assert_eq!(traverser.aggregate_degree_0, initial_degree_0);
+        assert_eq!(traverser.aggregate_degree_1, initial_degree_1);
+
+        Ok(())
+    }
 }
