@@ -404,9 +404,7 @@ impl SieveCircuit {
             wire_map.insert(input_wire, input_wires[i]);
         }
 
-        // Use a more sophisticated approach to prevent wire ID collisions
-        // Start assigning gate output wires from a high number to avoid collisions with input wires
-        let mut next_wire_id = current_wire + bristol.gates.len(); // Start from a safe high number
+        let mut next_wire_id = current_wire;
 
         // Map all gate output wires to new unique IDs
         for gate in &bristol.gates {
@@ -548,6 +546,116 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_xor_to_add_conversion() {
+        let bristol_str = r#"1 5
+2 1 1
+1 1
+2 1 0 1 4 XOR"#;
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+
+        // Verify the XOR gate was converted to an Add gate
+        let mut found_add_gate = false;
+        for gate in &sieve.gates {
+            if let SieveGate::Add { inputs, output } = gate {
+                if *output == 2 && inputs.contains(&0) && inputs.contains(&1) {
+                    found_add_gate = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_add_gate,
+            "XOR gate was not properly converted to Add gate"
+        );
+
+        // Verify the SIEVE IR text representation contains the Add gate
+        let sieve_text = sieve.to_string();
+        println!("{:?}", sieve_text);
+        assert!(
+            sieve_text.contains("$2 <- @add(0: $0, $1);"),
+            "SIEVE IR text does not contain the expected Add gate"
+        );
+    }
+
+    #[test]
+    fn test_and_to_mul_conversion() {
+        let bristol_str = r#"1 5
+2 1 1
+1 1
+2 1 0 1 4 AND"#;
+
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+
+        // Verify the AND gate was converted to a Mul gate
+        let mut found_mul_gate = false;
+        for gate in &sieve.gates {
+            if let SieveGate::Mul { inputs, output } = gate {
+                if *output == 2 && inputs.contains(&0) && inputs.contains(&1) {
+                    found_mul_gate = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_mul_gate,
+            "AND gate was not properly converted to Mul gate"
+        );
+
+        // Verify the SIEVE IR text representation contains the Mul gate
+        let sieve_text = sieve.to_string();
+        assert!(
+            sieve_text.contains("$2 <- @mul(0: $0, $1);"),
+            "SIEVE IR text does not contain the expected Mul gate"
+        );
+    }
+
+    #[test]
+    fn test_inv_to_addc_conversion() {
+        let bristol_str = r#"1 4
+1 1
+1 1
+1 1 0 3 INV"#;
+
+        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
+
+        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
+        let sieve_text = sieve.to_string();
+
+        // Verify the INV gate was converted to an AddConstant gate with constant 1
+        let mut found_inv_conversion = false;
+        for gate in &sieve.gates {
+            if let SieveGate::AddConstant {
+                input,
+                constant,
+                output,
+            } = gate
+            {
+                if *output == 1 && *input == 0 && *constant == 1 {
+                    found_inv_conversion = true;
+                    break;
+                }
+            }
+        }
+
+        assert!(
+            found_inv_conversion,
+            "INV gate was not properly converted to AddConstant gate with constant 1"
+        );
+
+        // Verify the SIEVE IR text representation contains the AddConstant gate for INV
+        assert!(
+            sieve_text.contains("$1 <- @addc(0: $0, < 1 >);"),
+            "SIEVE IR text does not contain the expected AddConstant gate for INV conversion"
+        );
+    }
+
+    #[test]
     fn test_parse_simple_circuit() {
         let bristol_str = r#"3 7
 2 1 1
@@ -582,7 +690,7 @@ mod tests {
         let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
 
         assert_eq!(sieve.input_wires, vec![0, 1]);
-        assert_eq!(sieve.output_wires, vec![7]);
+        assert_eq!(sieve.output_wires, vec![4]);
 
         // Check the SIEVE IR text representation
         let sieve_text = sieve.to_string();
@@ -590,14 +698,13 @@ mod tests {
         assert!(sieve_text.contains("@type field 2;"));
         assert!(sieve_text.contains("$0 <- @private(0);"));
         assert!(sieve_text.contains("$1 <- @private(0);"));
-        assert!(sieve_text.contains("$5 <- @add(0: $0, $1);"));
-        assert!(sieve_text.contains("$6 <- @mul(0: $0, $1);"));
-        assert!(sieve_text.contains("$7 <- @addc(0: $1, < 1 >);"));
+        assert!(sieve_text.contains("$2 <- @add(0: $0, $1);"));
+        assert!(sieve_text.contains("$3 <- @mul(0: $0, $1);"));
+        assert!(sieve_text.contains("$4 <- @addc(0: $1, < 1 >);"));
     }
 
     #[test]
     fn test_write_to_file() {
-        // Create a simple Bristol Fashion circuit
         let bristol_str = r#"3 7
 2 1 1
 1 1
@@ -605,51 +712,31 @@ mod tests {
 2 1 0 1 5 AND
 1 1 1 6 INV"#;
 
-        // Parse the circuit
         let bristol = BristolCircuit::from_str(bristol_str).unwrap();
 
-        // Convert to SIEVE IR
         let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
 
-        // Create a file in the project directory
         let output_path = "output/test_sieve.txt";
-
-        // Write to file
         sieve.to_file(output_path).unwrap();
-
-        // Verify file exists
         assert!(std::path::Path::new(output_path).exists());
 
-        // Read the file content
         let content = std::fs::read_to_string(output_path).unwrap();
-
-        // Verify content
         assert!(content.contains("version 2.0.0;"));
         assert!(content.contains("circuit;"));
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
         assert!(content.contains("$1 <- @private(0);"));
-        assert!(content.contains("$5 <- @add(0: $0, $1);"));
-        assert!(content.contains("$6 <- @mul(0: $0, $1);"));
-        assert!(content.contains("$7 <- @addc(0: $1, < 1 >);"));
+        assert!(content.contains("$2 <- @add(0: $0, $1);"));
+        assert!(content.contains("$3 <- @mul(0: $0, $1);"));
+        assert!(content.contains("$4 <- @addc(0: $1, < 1 >);"));
         assert!(content.contains("@end"));
 
-        // Print the absolute path of the file for easy access
-        println!(
-            "Test file created at: {}",
-            std::path::Path::new(output_path)
-                .canonicalize()
-                .unwrap()
-                .display()
-        );
-
-        // Note: We're not deleting the file so it can be inspected after the test
+        std::fs::remove_file(output_path).unwrap();
     }
 
     #[test]
     fn test_transpile_function() {
-        // Create a simple Bristol Fashion circuit
         let bristol_str = r#"3 7
 2 1 1
 1 1
@@ -657,188 +744,37 @@ mod tests {
 2 1 0 1 5 AND
 1 1 1 6 INV"#;
 
-        // Create input file in the project directory
-        // todo: should make this a temp file
         let temp_dir = tempfile::tempdir().unwrap();
         let input_path = temp_dir.path().join("test_bristol_input.txt");
         let output_path = temp_dir.path().join("test_sieve_output.txt");
         std::fs::write(&input_path, bristol_str).unwrap();
 
-        // Run the transpile function
         transpile(&input_path, &output_path).unwrap();
-
-        // Verify output file exists
         assert!(std::path::Path::new(&output_path).exists());
 
-        // Read the output file content
         let content = std::fs::read_to_string(&output_path).unwrap();
-
-        // Verify content
         assert!(content.contains("version 2.0.0;"));
         assert!(content.contains("circuit;"));
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
         assert!(content.contains("$1 <- @private(0);"));
-        assert!(content.contains("$5 <- @add(0: $0, $1);"));
-        assert!(content.contains("$6 <- @mul(0: $0, $1);"));
-        assert!(content.contains("$7 <- @addc(0: $1, < 1 >);"));
+        assert!(content.contains("$2 <- @add(0: $0, $1);"));
+        assert!(content.contains("$3 <- @mul(0: $0, $1);"));
+        assert!(content.contains("$4 <- @addc(0: $1, < 1 >);"));
         assert!(content.contains("@end"));
 
-        // Print the absolute paths of the files for easy access
-        println!(
-            "Test input file created at: {}",
-            std::path::Path::new(&input_path)
-                .canonicalize()
-                .unwrap()
-                .display()
-        );
-        println!(
-            "Test output file created at: {}",
-            std::path::Path::new(&output_path)
-                .canonicalize()
-                .unwrap()
-                .display()
-        );
-
-        // Note: We're not deleting the files so they can be inspected after the test
         std::fs::remove_file(input_path).unwrap();
         std::fs::remove_file(output_path).unwrap();
     }
 
     #[test]
-    fn test_xor_to_add_conversion() {
-        // Create a simple Bristol Fashion circuit with only an XOR gate
-        let bristol_str = r#"1 5
-2 1 1
-1 1
-2 1 0 1 4 XOR"#;
-
-        // Parse the circuit
-        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
-
-        // Convert to SIEVE IR
-        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
-
-        // Verify the XOR gate was converted to an Add gate
-        let mut found_add_gate = false;
-        for gate in &sieve.gates {
-            if let SieveGate::Add { inputs, output } = gate {
-                if *output == 3 && inputs.contains(&0) && inputs.contains(&1) {
-                    found_add_gate = true;
-                    break;
-                }
-            }
-        }
-
-        assert!(
-            found_add_gate,
-            "XOR gate was not properly converted to Add gate"
-        );
-
-        // Verify the SIEVE IR text representation contains the Add gate
-        let sieve_text = sieve.to_string();
-        println!("{:?}", sieve_text);
-        assert!(
-            sieve_text.contains("$3 <- @add(0: $0, $1);"),
-            "SIEVE IR text does not contain the expected Add gate"
-        );
-    }
-
-    #[test]
-    fn test_and_to_mul_conversion() {
-        // Create a simple Bristol Fashion circuit with only an AND gate
-        let bristol_str = r#"1 5
-2 1 1
-1 1
-2 1 0 1 4 AND"#;
-
-        // Parse the circuit
-        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
-
-        // Convert to SIEVE IR
-        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
-
-        // Verify the AND gate was converted to a Mul gate
-        let mut found_mul_gate = false;
-        for gate in &sieve.gates {
-            if let SieveGate::Mul { inputs, output } = gate {
-                if *output == 3 && inputs.contains(&0) && inputs.contains(&1) {
-                    found_mul_gate = true;
-                    break;
-                }
-            }
-        }
-
-        assert!(
-            found_mul_gate,
-            "AND gate was not properly converted to Mul gate"
-        );
-
-        // Verify the SIEVE IR text representation contains the Mul gate
-        let sieve_text = sieve.to_string();
-        assert!(
-            sieve_text.contains("$3 <- @mul(0: $0, $1);"),
-            "SIEVE IR text does not contain the expected Mul gate"
-        );
-    }
-
-    #[test]
-    fn test_inv_to_addc_conversion() {
-        // Create a simple Bristol Fashion circuit with only an INV gate
-        let bristol_str = r#"1 4
-1 1
-1 1
-1 1 0 3 INV"#;
-
-        // Parse the circuit
-        let bristol = BristolCircuit::from_str(bristol_str).unwrap();
-
-        // Convert to SIEVE IR
-        let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
-
-        // Verify the INV gate was converted to an AddConstant gate with constant 1
-        let mut found_inv_conversion = false;
-        for gate in &sieve.gates {
-            if let SieveGate::AddConstant {
-                input,
-                constant,
-                output,
-            } = gate
-            {
-                if *output == 2 && *input == 0 && *constant == 1 {
-                    found_inv_conversion = true;
-                    break;
-                }
-            }
-        }
-
-        assert!(
-            found_inv_conversion,
-            "INV gate was not properly converted to AddConstant gate with constant 1"
-        );
-
-        // Verify the SIEVE IR text representation contains the AddConstant gate for INV
-        let sieve_text = sieve.to_string();
-        assert!(
-            sieve_text.contains("$2 <- @addc(0: $0, < 1 >);"),
-            "SIEVE IR text does not contain the expected AddConstant gate for INV conversion"
-        );
-    }
-
-    #[test]
     fn test_with_keccak_f_circuit() {
-        // Path to the Keccak_f circuit file
         let input_path = "../bristol-fashion/circuits/Keccak_f.txt";
-
-        // Create a temporary output file for the SIEVE IR
         let output_path = "output/test_keccak_f_sieve.txt";
-
-        // Parse the Bristol Fashion circuit
         let bristol =
             BristolCircuit::from_file(input_path).expect("Failed to parse Keccak_f circuit");
 
-        // Verify basic circuit properties
         assert_eq!(bristol.num_gates, 192086, "Incorrect number of gates");
         assert_eq!(bristol.num_wires, 193686, "Incorrect number of wires");
         assert_eq!(
@@ -847,33 +783,22 @@ mod tests {
             "Incorrect input group sizes"
         );
 
-        // Convert to SIEVE IR
         let sieve = SieveCircuit::from_bristol(&bristol).expect("Failed to convert to SIEVE IR");
-
-        // No need to verify constant_one_wire as it's been removed
-
-        // Verify input wires mapping
         assert_eq!(
             sieve.input_wires.len(),
             1600,
             "Should have 1600 input wires"
         );
 
-        // Write SIEVE IR to file
         sieve
             .to_file(output_path)
             .expect("Failed to write SIEVE IR to file");
-
-        // Verify file exists
         assert!(
             std::path::Path::new(output_path).exists(),
             "Output file was not created"
         );
 
-        // Read the file content to verify basic structure
         let content = std::fs::read_to_string(output_path).expect("Failed to read output file");
-
-        // Verify content contains expected SIEVE IR elements
         assert!(
             content.contains("version 2.0.0;"),
             "Missing version in output"
@@ -902,7 +827,6 @@ mod tests {
         assert!(has_add_gate, "No add gates found in output");
         assert!(has_mul_gate, "No mul gates found in output");
 
-        // Clean up the test file
         std::fs::remove_file(output_path).expect("Failed to remove test output file");
 
         println!("Successfully tested transpiler with Keccak_f circuit");
