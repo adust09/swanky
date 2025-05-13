@@ -20,12 +20,11 @@ version 2.0.0;
 circuit;
 @type field 2;
 @begin
-  $0 <- @private(0);    // Constant 1 wire for INV gates
-  $1 <- @private(0);    // First input wire
-  $2 <- @private(0);    // Second input wire
-  $6 <- @add(0: $1, $2); // XOR gate (remapped from wire 4)
-  $7 <- @mul(0: $1, $2); // AND gate (remapped from wire 5)
-  $8 <- @add(0: $2, $0); // INV gate (remapped from wire 6)
+  $0 <- @private(0);    // First input wire
+  $1 <- @private(0);    // Second input wire
+  $2 <- @add(0: $0, $1); // XOR gate (remapped from wire 4)
+  $3 <- @mul(0: $0, $1); // AND gate (remapped from wire 5)
+  $4 <- @addc(0: $1, <1>); // INV gate (remapped from wire 6)
 @end
 ```
 
@@ -123,8 +122,7 @@ flowchart TD
   - **Convert to mul Gates**: Map each AND gate to a mul gate in SIEVE IR
   
 - **Process INV Gates**: Identify all INV gates in the circuit
-  - **Create Constant 1 Wire**: Create a dedicated private input wire with value 1
-  - **Convert to add Gates with Constant**: Map each INV gate to an add gate with the constant 1 wire
+  - **Convert to add Gates with Constant**: Map each INV gate to an add gate with the constant 1.
 
 The following table describes how each Bristol Fashion gate is mapped to SIEVE IR:
 
@@ -132,7 +130,7 @@ The following table describes how each Bristol Fashion gate is mapped to SIEVE I
 |---------------------|---------------------|----------------|
 | XOR { a, b, out }   | add                 | `$out' <- @add(0: $a', $b')` |
 | AND { a, b, out }   | mul                 | `$out' <- @mul(0: $a', $b')` |
-| INV { a, out }      | add with constant 1 | `$out' <- @add(0: $a', $0)` |
+| INV { a, out }      | add with constant 1 | `$out' <- @addc(0: $a', <1>)` |
 
 Note: `$a'`, `$b'`, and `$out'` represent the remapped wire IDs in SIEVE IR.
 
@@ -163,11 +161,8 @@ Bristol Fashion:
 1 1 1 6 INV       // Wire 6 = NOT Wire 1
 
 SIEVE IR:
-// First, create a constant 1 wire (at the beginning of the circuit)
-$0 <- @private(0);  // This input must always be set to 1
-
-// Then, for the INV gate (assuming a circuit with 3 gates and 2 inputs)
-$8 <- @add(0: $2, $0);  // NOT(a) = a ⊕ 1 in F2
+// For the INV gate (assuming a circuit with 3 gates and 2 inputs)
+$8 <- @addc(0: $2, <1>);  // NOT(a) = a + 1 in F2
 
 ```
 
@@ -205,24 +200,21 @@ The transpilation process consists of the following steps:
 
 ### 4.1 Constant Wire Creation
 
-For INV gates, a constant 1 wire is required. This is implemented using a dedicated private input:
+For INV gates, a constant 1 is added to the input wire using the `addc` gate:
 
 ```
-// Create a constant 1 wire
-$0 <- @private(0);  // This input must always be set to 1
+// NOT(a) = a + 1 in F2
+$8 <- @addc(0: $2, <1>);
 ```
-
-The private input stream must be configured to always provide a 1 for this wire.
 
 ### 4.2 Wire Mapping
 
-Wire IDs from Bristol Fashion are NOT mapped directly to SIEVE IR wire IDs. Instead, a more sophisticated approach is used to prevent wire ID collisions:
+Wire IDs from Bristol Fashion are NOT mapped directly to SIEVE IR wire IDs. Instead, the following approach is used:
 
-1. The constant 1 wire is assigned ID 0
-2. Input wires are assigned consecutive IDs starting from 1
-3. Gate output wires are assigned new IDs starting from `current_wire + bristol.gates.len()` to avoid collisions
+1. Input wires are assigned consecutive IDs starting from 0.
+2. Gate output wires are assigned consecutive IDs starting from the ID immediately following the last input wire.
 
-This approach ensures that there are no wire ID collisions, even in complex circuits with many gates.
+This approach ensures that there are no wire ID collisions.
 
 
 ## 5. Limitations and Considerations
