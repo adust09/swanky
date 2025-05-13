@@ -731,10 +731,10 @@ mod tests {
             }
         }
 
-        // assert!(
-        //     found_add_gate,
-        //     "XOR gate was not properly converted to Add gate"
-        // );
+        assert!(
+            found_add_gate,
+            "XOR gate was not properly converted to Add gate"
+        );
 
         // Verify the SIEVE IR text representation contains the Add gate
         let sieve_text = sieve.to_string();
