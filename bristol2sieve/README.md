@@ -169,6 +169,8 @@ $0 <- @private(0);  // This input must always be set to 1
 // Then, for the INV gate (assuming a circuit with 3 gates and 2 inputs)
 $8 <- @add(0: $2, $0);  // NOT(a) = a ⊕ 1 in F2
 
+```
+
 ### 2.3. Output Generation
 
 - **Wire Mapping**: Map Bristol Fashion wire IDs to SIEVE IR wire IDs using a collision-avoidance strategy
@@ -176,7 +178,6 @@ $8 <- @add(0: $2, $0);  // NOT(a) = a ⊕ 1 in F2
 - **Generate SIEVE IR Body**: Create the SIEVE IR body with all converted gates
 - **Output SIEVE IR Circuit File**: Write the complete SIEVE IR circuit to a file
 
-```
 
 ## 3. Transpilation Process
 

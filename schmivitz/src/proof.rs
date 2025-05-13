@@ -641,4 +641,37 @@ mod tests {
 
         Ok(())
     }
+
+    const ADDC_CIRCUIT: &str = "version 2.0.0;
+        circuit;
+        @type field 2;
+        @begin
+          $0 ... $2 <- @private(0);
+          $3 <- @addc(0: $0, < 1 >);
+          $4 <- @addc(0: $1, < 0 >);
+          $5 <- @add(0: $2, $3);
+
+        @end ";
+
+    #[test]
+    fn prove_works_with_addc_gate() -> Result<()> {
+        let private_input_bytes = "version 2.0.0;
+            private_input;
+            @type field 2;
+            @begin
+                < 1 >;
+                < 0 >;
+                < 1 >;
+            @end ";
+
+        let (proof_result, mut addc_circuit) = create_proof(ADDC_CIRCUIT, private_input_bytes);
+
+        // Unwrap the proof result
+        let proof = proof_result?;
+        // Verify the proof
+        // Just check if verification succeeds, we don't need to access the result fields
+        assert!(proof.verify(&mut addc_circuit, &mut transcript()).is_ok());
+
+        Ok(())
+    }
 }

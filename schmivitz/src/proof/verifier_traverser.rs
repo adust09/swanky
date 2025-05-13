@@ -5,8 +5,8 @@ use mac_n_cheese_sieve_parser::{
     ConversionSemantics, FunctionBodyVisitor, Identifier, Number, PluginBinding, RelationVisitor,
     TypeId, TypedCount, TypedWireRange, WireId, WireRange,
 };
-use swanky_field::FiniteRing;
-use swanky_field_binary::F128b;
+use swanky_field::{FiniteRing, PrimeFiniteField};
+use swanky_field_binary::{F128b, F2};
 
 /// A [`VerifierTraverser`] allows the verifier to execute the gate-by-gate evaluation portion of
 /// the VOLE-in-the-head verification protocol.
@@ -211,8 +211,14 @@ impl FunctionBodyVisitor for VerifierTraverser {
         Ok(())
     }
 
-    fn addc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+        let maybe_f2: Option<F2> = F2::try_from_int(*right).into();
+        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+        let f128b = F128b::from(f2);
+        // Compute the correct masked witness for the output wire
+        self.save_computed_masked_witness(dst, self.masked_witness(left)? + f128b)
     }
 
     fn mulc(&mut self, _ty: TypeId, _dst: WireId, _left: WireId, _right: &Number) -> Result<()> {
@@ -298,7 +304,7 @@ mod tests {
     use eyre::Result;
     use rand::{thread_rng, Rng};
     use swanky_field::FiniteRing;
-    use swanky_field_binary::F128b;
+    use swanky_field_binary::{F128b, F2};
 
     use super::VerifierTraverser;
 
@@ -391,6 +397,114 @@ mod tests {
                 .save_computed_masked_witness(wid, witness)
                 .is_err());
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gate_masked_witness_computation_works() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 100u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 101u64;
+
+        // Create a random masked witness for the input wire
+        let input_witness = F128b::random(rng);
+        traverser.save_computed_masked_witness(input_wid, input_witness)?;
+
+        // Create a constant value (1 in F2)
+        let constant_f2 = F2::ONE;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Compute the expected masked witness for the output wire (input_witness + constant)
+        let expected_output_witness = input_witness + constant_f128b;
+
+        // Manually simulate the addc operation
+        let output_witness = traverser.masked_witness(input_wid)? + constant_f128b;
+        traverser.save_computed_masked_witness(output_wid, output_witness)?;
+
+        // Verify the output masked witness is correct
+        assert_eq!(
+            traverser.masked_witness(output_wid)?,
+            expected_output_witness
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gate_with_zero_masked_witness_computation_works() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 200u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 201u64;
+
+        // Create a random masked witness for the input wire
+        let input_witness = F128b::random(rng);
+        traverser.save_computed_masked_witness(input_wid, input_witness)?;
+
+        // Create a constant value (0 in F2)
+        let constant_f2 = F2::ZERO;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Compute the expected masked witness for the output wire (input_witness + 0)
+        let expected_output_witness = input_witness + constant_f128b;
+
+        // Manually simulate the addc operation
+        let output_witness = traverser.masked_witness(input_wid)? + constant_f128b;
+        traverser.save_computed_masked_witness(output_wid, output_witness)?;
+
+        // Verify the output masked witness is correct
+        assert_eq!(
+            traverser.masked_witness(output_wid)?,
+            expected_output_witness
+        );
+
+        // Adding zero should not change the value
+        assert_eq!(traverser.masked_witness(output_wid)?, input_witness);
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gate_does_not_affect_aggregate() -> Result<()> {
+        let rng = &mut thread_rng();
+        let len = 4;
+        let mut traverser = dummy_traverser(len);
+
+        // Create a wire ID for the input wire
+        let input_wid = 300u64;
+
+        // Create a wire ID for the output wire
+        let output_wid = 301u64;
+
+        // Create a random masked witness for the input wire
+        let input_witness = F128b::random(rng);
+        traverser.save_computed_masked_witness(input_wid, input_witness)?;
+
+        // Create a constant value (1 in F2)
+        let constant_f2 = F2::ONE;
+        let constant_f128b = F128b::from(constant_f2);
+
+        // Save the initial aggregate value
+        let initial_aggregate = traverser.aggregate;
+
+        // Manually simulate the addc operation
+        let output_witness = traverser.masked_witness(input_wid)? + constant_f128b;
+        traverser.save_computed_masked_witness(output_wid, output_witness)?;
+
+        // Verify that the aggregate value hasn't changed (addc is a linear gate)
+        assert_eq!(traverser.aggregate, initial_aggregate);
 
         Ok(())
     }

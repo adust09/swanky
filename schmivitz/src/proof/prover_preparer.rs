@@ -115,15 +115,22 @@ impl<StreamReader: ValueStreamReaderT> FunctionBodyVisitor for ProverPreparer<St
         self.save_wire(dst, product)
     }
 
-    fn addc(
-        &mut self,
-        _ty: TypeId,
-        _dst: WireId,
-        _left: WireId,
-        _right: &Number,
-    ) -> eyre::Result<()> {
-        bail!("Invalid input: VOLE-in-the-head does not support `addc` gates");
+    fn addc(&mut self, ty: TypeId, dst: WireId, left: WireId, right: &Number) -> eyre::Result<()> {
+        // Assumption: There is exactly one type ID for these circuits and it is F2.
+        assert_eq!(ty, 0);
+
+        let maybe_f2: Option<F2> = F2::try_from_int(*right).into();
+        let f2 = maybe_f2.ok_or_else(|| eyre!("Invalid input: Private input was not in F2"))?;
+        let f64b = F64b::from(f2);
+
+        let sum = match (self.wire_values.get(&left), f64b) {
+            (Some(l_val), f64b) => l_val + f64b,
+            _ => bail!("Malformed circuit: used a wire that has not yet been defined"),
+        };
+
+        self.save_wire(dst, sum)
     }
+
     fn mulc(
         &mut self,
         _ty: TypeId,
@@ -217,8 +224,10 @@ impl<StreamReader: ValueStreamReaderT> RelationVisitor for ProverPreparer<Stream
 
 #[cfg(test)]
 mod tests {
+    use ark_ff::{One, Zero};
     use mac_n_cheese_sieve_parser::{text_parser::RelationReader, Number, ValueStreamReader};
     use std::io::Cursor;
+    use swanky_field_binary::{F64b, F2};
 
     use crate::proof::prover_preparer::ProverPreparer;
 
@@ -370,6 +379,97 @@ mod tests {
             counter.wire_values[&0] + counter.wire_values[&1],
             counter.wire_values[&2]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gates_eval_correctly() -> eyre::Result<()> {
+        let one_add = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 <- @private(0);
+              $1 <- @addc(0: $0, < 1 >);
+            @end ";
+
+        // This evaluates on a random input; over time we'll check them all
+        let counter = prepare_circuit(one_add)?;
+
+        // The constant 1 should be converted to F64b
+        let constant_f2 = F2::one();
+        let constant_f64b = F64b::from(constant_f2);
+
+        // Check that $1 = $0 + 1
+        assert_eq!(
+            counter.wire_values[&0] + constant_f64b,
+            counter.wire_values[&1]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gates_with_zero_eval_correctly() -> eyre::Result<()> {
+        let zero_add = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 <- @private(0);
+              $1 <- @addc(0: $0, < 0 >);
+            @end ";
+
+        let counter = prepare_circuit(zero_add)?;
+
+        // The constant 0 should be converted to F64b
+        let constant_f2 = F2::zero();
+        let constant_f64b = F64b::from(constant_f2);
+
+        // Check that $1 = $0 + 0
+        assert_eq!(
+            counter.wire_values[&0] + constant_f64b,
+            counter.wire_values[&1]
+        );
+
+        // Adding zero should not change the value
+        assert_eq!(counter.wire_values[&0], counter.wire_values[&1]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn addc_gates_count_correctly() -> eyre::Result<()> {
+        // addc gates are linear gates and should not be counted in the extended witness
+        let circuit = "version 2.0.0;
+            circuit;
+            @type field 2;
+            @begin
+              $0 <- @private(0);
+              $1 <- @addc(0: $0, < 1 >);
+              $2 <- @addc(0: $1, < 1 >);
+              $3 <- @addc(0: $2, < 0 >);
+            @end ";
+
+        let counter = prepare_circuit(circuit)?;
+
+        // Only the private input should be counted in the witness
+        assert_eq!(counter.count(), 1);
+
+        // Check that the addc operations were performed correctly
+        let constant_f2 = F2::one();
+        let constant_f64b = F64b::from(constant_f2);
+
+        assert_eq!(
+            counter.wire_values[&0] + constant_f64b,
+            counter.wire_values[&1]
+        );
+
+        assert_eq!(
+            counter.wire_values[&1] + constant_f64b,
+            counter.wire_values[&2]
+        );
+
+        assert_eq!(counter.wire_values[&2], counter.wire_values[&3]);
 
         Ok(())
     }

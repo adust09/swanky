@@ -33,6 +33,12 @@ pub enum SieveGate {
     Add { inputs: Vec<usize>, output: usize },
     /// Multiplication gate (AND in binary field)
     Mul { inputs: Vec<usize>, output: usize },
+    /// Add Constant gate
+    AddConstant {
+        input: usize,
+        constant: usize,
+        output: usize,
+    },
 }
 
 impl Display for SieveGate {
@@ -56,6 +62,13 @@ impl Display for SieveGate {
                     return write!(f, "// ERROR: Mul gate must have exactly 2 inputs");
                 }
                 write!(f, "${} <- @mul(0: ${}, ${});", output, inputs[0], inputs[1])
+            }
+            SieveGate::AddConstant {
+                input,
+                constant,
+                output,
+            } => {
+                write!(f, "${} <- @addc(0: ${}, < {} >);", output, input, constant)
             }
         }
     }
@@ -89,8 +102,6 @@ pub struct BristolCircuit {
 pub struct SieveCircuit {
     /// Gates in the circuit
     pub gates: Vec<SieveGate>,
-    /// The constant 1 wire index (used for INV gates)
-    pub constant_one_wire: usize,
     /// Input wire indices
     pub input_wires: Vec<usize>,
     /// Output wire indices
@@ -373,18 +384,9 @@ impl SieveCircuit {
         // Create a new SIEVE IR circuit
         let mut sieve_gates = Vec::new();
 
-        // Create a constant 1 wire for INV gates
-        // This will be the first private input
-        let constant_one_wire = 0;
-        sieve_gates.push(SieveGate::Private {
-            output: constant_one_wire,
-            party: 0,
-        });
-
         // Create private inputs for all Bristol inputs
-        // Start from wire index 1 (after the constant 1 wire)
         let mut input_wires = Vec::new();
-        let mut current_wire = 1;
+        let mut current_wire = 0;
         for _ in &bristol.input_wires {
             input_wires.push(current_wire);
             sieve_gates.push(SieveGate::Private {
@@ -469,9 +471,10 @@ impl SieveCircuit {
                         .get(output)
                         .expect("Output wire ID should be mapped");
 
-                    // Create an add gate with the constant 1 wire
-                    sieve_gates.push(SieveGate::Add {
-                        inputs: vec![sieve_input, constant_one_wire],
+                    // Create an addc gate with constant 1
+                    sieve_gates.push(SieveGate::AddConstant {
+                        input: sieve_input,
+                        constant: 1,
                         output: sieve_output,
                     });
                 }
@@ -491,7 +494,6 @@ impl SieveCircuit {
 
         Ok(SieveCircuit {
             gates: sieve_gates,
-            constant_one_wire,
             input_wires,
             output_wires,
         })
@@ -579,19 +581,18 @@ mod tests {
         let bristol = BristolCircuit::from_str(bristol_str).unwrap();
         let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
 
-        assert_eq!(sieve.gates.len(), 6); // 1 constant + 2 inputs + 3 gates
-        assert_eq!(sieve.constant_one_wire, 0);
-        assert_eq!(sieve.input_wires, vec![1, 2]);
-        assert_eq!(sieve.output_wires, vec![8]);
+        assert_eq!(sieve.input_wires, vec![0, 1]);
+        assert_eq!(sieve.output_wires, vec![7]);
 
         // Check the SIEVE IR text representation
         let sieve_text = sieve.to_string();
         assert!(sieve_text.contains("version 2.0.0;"));
         assert!(sieve_text.contains("@type field 2;"));
         assert!(sieve_text.contains("$0 <- @private(0);"));
-        assert!(sieve_text.contains("$6 <- @add(0: $1, $2);"));
-        assert!(sieve_text.contains("$7 <- @mul(0: $1, $2);"));
-        assert!(sieve_text.contains("$8 <- @add(0: $2, $0);"));
+        assert!(sieve_text.contains("$1 <- @private(0);"));
+        assert!(sieve_text.contains("$5 <- @add(0: $0, $1);"));
+        assert!(sieve_text.contains("$6 <- @mul(0: $0, $1);"));
+        assert!(sieve_text.contains("$7 <- @addc(0: $1, < 1 >);"));
     }
 
     #[test]
@@ -628,9 +629,10 @@ mod tests {
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
-        assert!(content.contains("$6 <- @add(0: $1, $2);"));
-        assert!(content.contains("$7 <- @mul(0: $1, $2);"));
-        assert!(content.contains("$8 <- @add(0: $2, $0);"));
+        assert!(content.contains("$1 <- @private(0);"));
+        assert!(content.contains("$5 <- @add(0: $0, $1);"));
+        assert!(content.contains("$6 <- @mul(0: $0, $1);"));
+        assert!(content.contains("$7 <- @addc(0: $1, < 1 >);"));
         assert!(content.contains("@end"));
 
         // Print the absolute path of the file for easy access
@@ -657,20 +659,19 @@ mod tests {
 
         // Create input file in the project directory
         // todo: should make this a temp file
-        let input_path = "test/test_bristol_input.txt";
-        std::fs::write(input_path, bristol_str).unwrap();
-
-        // Create output file path in the project directory
-        let output_path = "output/test_sieve_output2.txt";
+        let temp_dir = tempfile::tempdir().unwrap();
+        let input_path = temp_dir.path().join("test_bristol_input.txt");
+        let output_path = temp_dir.path().join("test_sieve_output.txt");
+        std::fs::write(&input_path, bristol_str).unwrap();
 
         // Run the transpile function
-        transpile(input_path, output_path).unwrap();
+        transpile(&input_path, &output_path).unwrap();
 
         // Verify output file exists
-        assert!(std::path::Path::new(output_path).exists());
+        assert!(std::path::Path::new(&output_path).exists());
 
         // Read the output file content
-        let content = std::fs::read_to_string(output_path).unwrap();
+        let content = std::fs::read_to_string(&output_path).unwrap();
 
         // Verify content
         assert!(content.contains("version 2.0.0;"));
@@ -678,22 +679,23 @@ mod tests {
         assert!(content.contains("@type field 2;"));
         assert!(content.contains("@begin"));
         assert!(content.contains("$0 <- @private(0);"));
-        assert!(content.contains("$6 <- @add(0: $1, $2);"));
-        assert!(content.contains("$7 <- @mul(0: $1, $2);"));
-        assert!(content.contains("$8 <- @add(0: $2, $0);"));
+        assert!(content.contains("$1 <- @private(0);"));
+        assert!(content.contains("$5 <- @add(0: $0, $1);"));
+        assert!(content.contains("$6 <- @mul(0: $0, $1);"));
+        assert!(content.contains("$7 <- @addc(0: $1, < 1 >);"));
         assert!(content.contains("@end"));
 
         // Print the absolute paths of the files for easy access
         println!(
             "Test input file created at: {}",
-            std::path::Path::new(input_path)
+            std::path::Path::new(&input_path)
                 .canonicalize()
                 .unwrap()
                 .display()
         );
         println!(
             "Test output file created at: {}",
-            std::path::Path::new(output_path)
+            std::path::Path::new(&output_path)
                 .canonicalize()
                 .unwrap()
                 .display()
@@ -722,7 +724,7 @@ mod tests {
         let mut found_add_gate = false;
         for gate in &sieve.gates {
             if let SieveGate::Add { inputs, output } = gate {
-                if *output == 4 && inputs.contains(&1) && inputs.contains(&2) {
+                if *output == 3 && inputs.contains(&0) && inputs.contains(&1) {
                     found_add_gate = true;
                     break;
                 }
@@ -736,8 +738,9 @@ mod tests {
 
         // Verify the SIEVE IR text representation contains the Add gate
         let sieve_text = sieve.to_string();
+        println!("{:?}", sieve_text);
         assert!(
-            sieve_text.contains("$4 <- @add(0: $1, $2);"),
+            sieve_text.contains("$3 <- @add(0: $0, $1);"),
             "SIEVE IR text does not contain the expected Add gate"
         );
     }
@@ -760,7 +763,7 @@ mod tests {
         let mut found_mul_gate = false;
         for gate in &sieve.gates {
             if let SieveGate::Mul { inputs, output } = gate {
-                if *output == 4 && inputs.contains(&1) && inputs.contains(&2) {
+                if *output == 3 && inputs.contains(&0) && inputs.contains(&1) {
                     found_mul_gate = true;
                     break;
                 }
@@ -775,13 +778,13 @@ mod tests {
         // Verify the SIEVE IR text representation contains the Mul gate
         let sieve_text = sieve.to_string();
         assert!(
-            sieve_text.contains("$4 <- @mul(0: $1, $2);"),
+            sieve_text.contains("$3 <- @mul(0: $0, $1);"),
             "SIEVE IR text does not contain the expected Mul gate"
         );
     }
 
     #[test]
-    fn test_inv_to_add_with_constant_conversion() {
+    fn test_inv_to_addc_conversion() {
         // Create a simple Bristol Fashion circuit with only an INV gate
         let bristol_str = r#"1 4
 1 1
@@ -794,17 +797,16 @@ mod tests {
         // Convert to SIEVE IR
         let sieve = SieveCircuit::from_bristol(&bristol).unwrap();
 
-        // Verify the constant 1 wire exists
-        assert_eq!(
-            sieve.constant_one_wire, 0,
-            "Constant 1 wire should be at index 0"
-        );
-
-        // Verify the INV gate was converted to an Add gate with the constant 1 wire
+        // Verify the INV gate was converted to an AddConstant gate with constant 1
         let mut found_inv_conversion = false;
         for gate in &sieve.gates {
-            if let SieveGate::Add { inputs, output } = gate {
-                if *output == 3 && inputs.contains(&1) && inputs.contains(&0) {
+            if let SieveGate::AddConstant {
+                input,
+                constant,
+                output,
+            } = gate
+            {
+                if *output == 2 && *input == 0 && *constant == 1 {
                     found_inv_conversion = true;
                     break;
                 }
@@ -813,14 +815,14 @@ mod tests {
 
         assert!(
             found_inv_conversion,
-            "INV gate was not properly converted to Add gate with constant 1"
+            "INV gate was not properly converted to AddConstant gate with constant 1"
         );
 
-        // Verify the SIEVE IR text representation contains the Add gate for INV
+        // Verify the SIEVE IR text representation contains the AddConstant gate for INV
         let sieve_text = sieve.to_string();
         assert!(
-            sieve_text.contains("$3 <- @add(0: $1, $0);"),
-            "SIEVE IR text does not contain the expected Add gate for INV conversion"
+            sieve_text.contains("$2 <- @addc(0: $0, < 1 >);"),
+            "SIEVE IR text does not contain the expected AddConstant gate for INV conversion"
         );
     }
 
@@ -828,6 +830,9 @@ mod tests {
     fn test_with_keccak_f_circuit() {
         // Path to the Keccak_f circuit file
         let input_path = "../bristol-fashion/circuits/Keccak_f.txt";
+
+        // Create a temporary output file for the SIEVE IR
+        let output_path = "output/test_keccak_f_sieve.txt";
 
         // Parse the Bristol Fashion circuit
         let bristol =
@@ -845,11 +850,7 @@ mod tests {
         // Convert to SIEVE IR
         let sieve = SieveCircuit::from_bristol(&bristol).expect("Failed to convert to SIEVE IR");
 
-        // Verify SIEVE IR properties
-        assert_eq!(
-            sieve.constant_one_wire, 0,
-            "Constant 1 wire should be at index 0"
-        );
+        // No need to verify constant_one_wire as it's been removed
 
         // Verify input wires mapping
         assert_eq!(
@@ -857,9 +858,6 @@ mod tests {
             1600,
             "Should have 1600 input wires"
         );
-
-        // Create a temporary output file for the SIEVE IR
-        let output_path = "output/test_keccak_f_sieve.txt";
 
         // Write SIEVE IR to file
         sieve

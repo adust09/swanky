@@ -49,18 +49,15 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    println!("hoge");
-
     // Create a constraint system for boolean conversions
     let cs = ConstraintSystem::<Bn254Fr>::new_ref();
 
     // Build the circuit using boolean arrays
     let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
-    println!("hoge");
+    println!("num of constraints{:?}", cs.num_constraints());
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
-    println!("hoge");
 
     let solidity_verifier = Groth16::<Bn254>::export(&vk);
     let output_dir = Path::new("solidity_output");
