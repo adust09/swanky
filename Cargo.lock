@@ -590,21 +590,17 @@ dependencies = [
 
 [[package]]
 name = "bristol2sieve"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "bincode",
- "bristol-fashion",
  "clap 4.5.36",
  "crossbeam",
  "eyre",
- "mac-n-cheese-ir",
- "mac-n-cheese-sieve-parser",
  "merlin",
  "num_cpus",
  "rand",
- "scuttlebutt",
+ "schmivitz",
  "tempfile",
- "vectoreyes",
 ]
 
 [[package]]
@@ -2700,7 +2696,6 @@ dependencies = [
  "ark-std",
  "base64",
  "blake3",
- "bristol2sieve",
  "clap 2.34.0",
  "eyre",
  "generic-array 1.2.0",
