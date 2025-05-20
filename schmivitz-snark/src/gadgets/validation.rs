@@ -1,8 +1,12 @@
 use std::iter::zip;
 
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::prelude::Boolean;
+use ark_ff::{One, Zero};
+use ark_r1cs_std::{prelude::Boolean, R1CSVar};
 use ark_relations::r1cs::SynthesisError;
+use swanky_field_binary::F128b;
+
+use crate::BinaryFieldVar;
 
 pub struct ValidationVar;
 
@@ -123,6 +127,142 @@ impl ValidationVar {
 
         Ok(validation_aggregate)
     }
+
+    /// Helper function to perform polynomial multiplication in binary field
+    fn polynomial_multiply(
+        a: &BinaryFieldVar<Bn254Fr, F128b>,
+        b: &BinaryFieldVar<Bn254Fr, F128b>,
+    ) -> Result<BinaryFieldVar<Bn254Fr, F128b>, SynthesisError> {
+        // For binary fields, we need to implement polynomial multiplication
+        // This is a simplified implementation that works for our specific case
+
+        // Convert to bits for multiplication
+        let a_bits = a.to_bits_le()?;
+        let b_bits = b.to_bits_le()?;
+
+        // Initialize result with zeros
+        let cs = a.value.cs();
+        let mut result_bits = Vec::with_capacity(128);
+        for _ in 0..128 {
+            result_bits.push(Boolean::constant(false));
+        }
+
+        // Perform bit-by-bit multiplication (similar to the original implementation)
+        for (i, a_bit) in a_bits.iter().enumerate() {
+            if i >= 128 {
+                break;
+            }
+
+            for (j, b_bit) in b_bits.iter().enumerate() {
+                if j >= 128 || i + j >= 128 {
+                    continue;
+                }
+
+                // Compute a_bit AND b_bit
+                let and_result = Boolean::and(a_bit, b_bit)?;
+
+                // XOR with the corresponding bit in result_bits (at position i+j)
+                result_bits[i + j] = Boolean::xor(&result_bits[i + j], &and_result)?;
+            }
+        }
+
+        // Convert back to BinaryFieldVar
+        BinaryFieldVar::<Bn254Fr, F128b>::from_bits_le(&result_bits)
+    }
+
+    /// Helper function to shift left a BinaryFieldVar by 1 bit
+    fn shift_left(
+        value: &BinaryFieldVar<Bn254Fr, F128b>,
+    ) -> Result<BinaryFieldVar<Bn254Fr, F128b>, SynthesisError> {
+        // Convert to bits
+        let bits = value.to_bits_le()?;
+
+        // Shift left by 1 bit
+        let mut shifted_bits = Vec::with_capacity(128);
+        shifted_bits.push(Boolean::constant(false)); // Insert 0 at the beginning
+
+        // Copy the remaining bits, dropping the last one
+        for i in 0..127 {
+            shifted_bits.push(bits[i].clone());
+        }
+
+        // Convert back to BinaryFieldVar
+        BinaryFieldVar::<Bn254Fr, F128b>::from_bits_le(&shifted_bits)
+    }
+
+    /// Optimized version of compute_validation_aggregate that uses BinaryFieldVar
+    #[tracing::instrument(target = "r1cs", skip(witness_challenges_vars, masked_witnesses_vars))]
+    pub fn compute_validation_aggregate_optimized(
+        witness_challenges_vars: &[BinaryFieldVar<Bn254Fr, F128b>],
+        masked_witnesses_vars: &[BinaryFieldVar<Bn254Fr, F128b>],
+    ) -> Result<BinaryFieldVar<Bn254Fr, F128b>, SynthesisError> {
+        if witness_challenges_vars.len() > masked_witnesses_vars.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+
+        // Initialize the validation aggregate with zeros
+        let mut validation_aggregate = BinaryFieldVar::<Bn254Fr, F128b>::constant(F128b::zero());
+
+        // Compute the validation aggregate as the sum of (challenge * masked_witness)
+        for (challenge, masked_witness) in witness_challenges_vars
+            .iter()
+            .zip(masked_witnesses_vars.iter())
+        {
+            // Compute challenge * masked_witness using polynomial multiplication
+            let product = Self::polynomial_multiply(challenge, masked_witness)?;
+
+            // Add product to validation_aggregate (XOR for binary field addition)
+            validation_aggregate = validation_aggregate.xor(&product)?;
+        }
+
+        Ok(validation_aggregate)
+    }
+    /// Helper function to perform polynomial multiplication in binary field
+
+    /// Optimized version of combine that uses BinaryFieldVar instead of Boolean arrays
+    ///
+    /// This corresponds to the calculation in proof.rs line 273:
+    #[tracing::instrument(target = "r1cs", skip(mask_voles_vars))]
+    pub fn combine_optimized(
+        mask_voles_vars: &Vec<BinaryFieldVar<Bn254Fr, F128b>>,
+    ) -> Result<BinaryFieldVar<Bn254Fr, F128b>, SynthesisError> {
+        // Log the number of constraints before
+        let cs = mask_voles_vars[0].value.cs();
+        let constraints_before = cs.num_constraints();
+        println!(
+            "Constraints before combine_optimized: {}",
+            constraints_before
+        );
+
+        // Initialize accumulator with zeros (F128b::ZERO)
+        let mut acc = BinaryFieldVar::<Bn254Fr, F128b>::constant(F128b::zero());
+
+        // Initialize power with ONE (F128b::ONE)
+        let mut power = BinaryFieldVar::<Bn254Fr, F128b>::constant(F128b::one());
+
+        // Process each mask_vole value
+        for mask_vole_var in mask_voles_vars.iter() {
+            // Compute vi * power using polynomial multiplication
+            let product = Self::polynomial_multiply(mask_vole_var, &power)?;
+
+            // Add product to accumulator (XOR for binary field addition)
+            acc = acc.xor(&product)?;
+
+            // Update power for next iteration (shift left by 1 in binary field)
+            power = Self::shift_left(&power)?;
+        }
+
+        // Log the number of constraints after
+        let constraints_after = cs.num_constraints();
+        println!("Constraints after combine_optimized: {}", constraints_after);
+        println!(
+            "Constraints reduced: {}",
+            constraints_before - constraints_after
+        );
+
+        Ok(acc)
+    }
+
     // This corresponds to the calculation in proof.rs line 317-318:
     // let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
     //     + self.degree_0_commitment;
