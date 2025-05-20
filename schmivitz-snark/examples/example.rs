@@ -47,26 +47,31 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    // Create a constraint system for boolean conversions
-    let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+    // Create a constraint system for the optimized implementation
+    let cs_optimized = ConstraintSystem::<Bn254Fr>::new_ref();
 
-    // Build the circuit using boolean arrays
-    let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
-    println!("num of constraints{:?}", cs.num_constraints());
+    // Build the circuit using optimized field vars
+    let circuit_optimized = build_circuit(cs_optimized.clone(), schmivitz_proof.clone());
+    println!(
+        "Optimized implementation - Number of constraints: {:?}",
+        cs_optimized.num_constraints()
+    );
 
+    // Use the optimized circuit for the SNARK proof
     let mut rng = ark_std::test_rng();
-    println!("hoge");
-    let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
+    println!("Setting up SNARK...");
+    let (pk, vk) =
+        Groth16::<Bn254>::circuit_specific_setup(circuit_optimized.clone(), &mut rng).unwrap();
 
     let public_input = vec![];
 
-    println!("hoge");
-    let snark_proof = Groth16::prove(&pk, circuit, &mut rng)?;
-    println!("hoge");
+    println!("Generating SNARK proof...");
+    let snark_proof = Groth16::prove(&pk, circuit_optimized, &mut rng)?;
+    println!("Verifying SNARK proof...");
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
 
     println!(
-        "Verified SNARK proof with boolean arrays: {}",
+        "Verified SNARK proof with optimized implementation: {}",
         if is_valid { "VALID" } else { "INVALID" }
     );
 
