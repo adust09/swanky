@@ -1,10 +1,7 @@
 pub mod constraints;
 mod field_mappings;
 mod gadgets;
-pub use constraints::{
-    build_circuit, PartialDecommitmentBoolean, PartialDecommitmentOptimized,
-    VoleVerificationBoolean, VoleVerificationOptimized,
-};
+pub use constraints::{build_circuit, PartialDecommitment, VoleVerification};
 
 // Re-export field conversion functions
 pub use field_mappings::{

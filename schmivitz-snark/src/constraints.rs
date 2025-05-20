@@ -9,90 +9,28 @@ use swanky_field_binary::{F128b, F64b, F8b};
 
 use crate::{
     f64b_to_field_var, f8b_to_field_var,
-    field_mappings::{f128b_to_boolean_array_public, f128b_to_field_var, BinaryFieldVar},
+    field_mappings::{f128b_to_field_input_var, f128b_to_field_var, BinaryFieldVar},
     gadgets::{MaskedWitnessVar, ValidationVar},
 };
 
-#[derive(Debug, Clone)]
-pub struct VoleVerificationBoolean {
-    pub witness_commitment: Vec<Vec<Boolean<Bn254Fr>>>, // F64b as boolean arrays
-    pub witness_challenges: Vec<Vec<Boolean<Bn254Fr>>>, // F128b as boolean arrays
-    pub degree_0_commitment: Vec<Boolean<Bn254Fr>>,     // F128b as boolean array
-    pub degree_1_commitment: Vec<Boolean<Bn254Fr>>,     // F128b as boolean array
-    pub partial_decommitment: PartialDecommitmentBoolean,
-}
-
-#[derive(Debug, Clone)]
-pub struct PartialDecommitmentBoolean {
-    pub verifier_key: Vec<Boolean<Bn254Fr>>, // F128b as boolean array
-    pub witness_voles: Vec<Vec<Vec<Boolean<Bn254Fr>>>>, // Vec<[F8b; REPETITION_PARAM]> as boolean arrays
-    pub mask_voles: Vec<Vec<Boolean<Bn254Fr>>>, // [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] as boolean arrays
-}
-
-impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationBoolean {
-    fn generate_constraints(self, _cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError>
-    where
-        Bn254Fr: PrimeField,
-    {
-        // Step 1: Compute d_delta from witness commitment and verifier key
-        let d_delta_var = MaskedWitnessVar::compute_d_delta(
-            &self.witness_commitment,
-            &self.partial_decommitment.verifier_key.clone(),
-        )?;
-
-        // Step 2: Compute masked witnesses from witness voles and d_delta
-        let masked_witnesses_var = MaskedWitnessVar::compute_masked_witness(
-            &self.partial_decommitment.witness_voles,
-            &d_delta_var,
-        )?;
-
-        // Step 3: Compute validation_mask
-        let validation_mask_var = ValidationVar::combine(&self.partial_decommitment.mask_voles)?;
-
-        // Step 4: Compute the final validation value
-        let validation_aggregate_var = ValidationVar::compute_validation_aggregate(
-            &self.witness_challenges,
-            &masked_witnesses_var,
-        )?;
-
-        let validation_var = zip(validation_aggregate_var, validation_mask_var)
-            .map(|(agg, mask)| agg.or(&mask))
-            .collect::<Vec<_>>();
-
-        // Step 5: Calculate actual_validation (degree_1_commitment * verifier_key + degree_0_commitment)
-        let actual_validation_var = ValidationVar::compute_actual_validation(
-            &self.degree_0_commitment,
-            &self.degree_1_commitment,
-            &self.partial_decommitment.verifier_key,
-        )?;
-
-        // Step 6: Check that validation_var equals actual_validation_var
-        for (val_bit, actual_bit) in zip(&validation_var, &actual_validation_var) {
-            val_bit.clone().unwrap().clone().enforce_equal(actual_bit)?;
-        }
-
-        Ok(())
-    }
-}
-
 /// Optimized version of VoleVerificationBoolean that uses BinaryFieldVar for binary field values
 #[derive(Debug, Clone)]
-pub struct VoleVerificationOptimized {
+pub struct VoleVerification {
     pub witness_commitment: Vec<BinaryFieldVar<Bn254Fr, F64b>>, // F64b as optimized field vars
-    pub witness_challenges: Vec<Vec<Boolean<Bn254Fr>>>, // F128b as boolean arrays (keeping as public inputs)
-    pub degree_0_commitment: BinaryFieldVar<Bn254Fr, F128b>, // F128b as optimized field var
-    pub degree_1_commitment: BinaryFieldVar<Bn254Fr, F128b>, // F128b as optimized field var
-    pub partial_decommitment: PartialDecommitmentOptimized,
+    pub witness_challenges: Vec<BinaryFieldVar<Bn254Fr, F128b>>, // F128b as optimized field vars (public inputs)
+    pub degree_0_commitment: BinaryFieldVar<Bn254Fr, F128b>,     // F128b as optimized field var
+    pub degree_1_commitment: BinaryFieldVar<Bn254Fr, F128b>,     // F128b as optimized field var
+    pub partial_decommitment: PartialDecommitment,
 }
 
 #[derive(Debug, Clone)]
-pub struct PartialDecommitmentOptimized {
+pub struct PartialDecommitment {
     pub verifier_key: BinaryFieldVar<Bn254Fr, F128b>, // F128b as optimized field var
     pub witness_voles: Vec<Vec<BinaryFieldVar<Bn254Fr, F8b>>>, // Vec<[F8b; REPETITION_PARAM]> as optimized field vars
     pub mask_voles: Vec<BinaryFieldVar<Bn254Fr, F128b>>, // [F128b; REPETITION_PARAM * VOLE_SIZE_PARAM] as optimized field vars
 }
 
-impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationOptimized {
+impl ConstraintSynthesizer<Bn254Fr> for VoleVerification {
     fn generate_constraints(self, _cs: ConstraintSystemRef<Bn254Fr>) -> Result<(), SynthesisError>
     where
         Bn254Fr: PrimeField,
@@ -140,8 +78,15 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationOptimized {
         let validation_mask_var = ValidationVar::combine(&mask_voles_booleans)?;
 
         // Step 4: Compute the final validation value
+        // Convert witness_challenges from BinaryFieldVar to boolean arrays
+        let witness_challenges_booleans: Vec<Vec<Boolean<Bn254Fr>>> = self
+            .witness_challenges
+            .iter()
+            .map(|value| value.to_bits_le())
+            .collect::<Result<Vec<_>, _>>()?;
+
         let validation_aggregate_var = ValidationVar::compute_validation_aggregate(
-            &self.witness_challenges,
+            &witness_challenges_booleans,
             &masked_witnesses_var,
         )?;
 
@@ -168,7 +113,7 @@ impl ConstraintSynthesizer<Bn254Fr> for VoleVerificationOptimized {
 pub fn build_circuit(
     cs: ark_relations::r1cs::ConstraintSystemRef<Bn254Fr>,
     schmivitz_proof: Proof<InsecureVole>,
-) -> VoleVerificationOptimized {
+) -> VoleVerification {
     // Convert witness commitment (F64b) to optimized field vars
     let witness_commitment_vars: Vec<BinaryFieldVar<Bn254Fr, F64b>> = schmivitz_proof
         .witness_commitment
@@ -176,11 +121,11 @@ pub fn build_circuit(
         .map(|value| f64b_to_field_var(cs.clone(), value).unwrap())
         .collect();
 
-    // Convert witness challenges (F128b) to boolean arrays (keeping as public inputs)
-    let witness_challenges_booleans: Vec<Vec<Boolean<Bn254Fr>>> = schmivitz_proof
+    // Convert witness challenges (F128b) to optimized field vars (as public inputs)
+    let witness_challenges_vars: Vec<BinaryFieldVar<Bn254Fr, F128b>> = schmivitz_proof
         .witness_challenges
         .iter()
-        .map(|value| f128b_to_boolean_array_public(cs.clone(), value).unwrap())
+        .map(|value| f128b_to_field_input_var(cs.clone(), value).unwrap())
         .collect();
 
     // Convert degree commitments to optimized field vars
@@ -218,12 +163,12 @@ pub fn build_circuit(
     }
 
     // Build the circuit with optimized field vars
-    let circuit = VoleVerificationOptimized {
+    let circuit = VoleVerification {
         witness_commitment: witness_commitment_vars,
-        witness_challenges: witness_challenges_booleans,
+        witness_challenges: witness_challenges_vars,
         degree_0_commitment: degree_0_commitment_var,
         degree_1_commitment: degree_1_commitment_var,
-        partial_decommitment: PartialDecommitmentOptimized {
+        partial_decommitment: PartialDecommitment {
             verifier_key: verifier_key_var,
             mask_voles: mask_voles_vars,
             witness_voles: witness_voles_vars,
