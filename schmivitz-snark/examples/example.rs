@@ -9,10 +9,9 @@ use rand::thread_rng;
 use schmivitz::{insecure::InsecureVole, Proof};
 use schmivitz_snark::build_circuit;
 use std::{
-    fs::{self, File},
-    io::{Cursor, Write},
+    fs::{self},
+    io::Cursor,
 };
-use tempfile::tempdir;
 use tracing_subscriber::layer::SubscriberExt;
 
 fn main() -> Result<()> {
@@ -20,23 +19,17 @@ fn main() -> Result<()> {
     layer.mode = TracingMode::OnlyConstraints;
     let subscriber = tracing_subscriber::Registry::default().with(layer);
     let _guard = tracing::subscriber::set_default(subscriber);
-    // target circuit - read from circuit.txt
+
     let circuit_str = fs::read_to_string("schmivitz-snark/examples/circuit.txt")?;
     let circuit = Cursor::new(circuit_str.as_bytes());
 
-    // read private input from private.txt
-    let private_input_bytes = fs::read_to_string("schmivitz-snark/examples/private.txt")?;
-
-    let dir = tempdir().unwrap();
-    let private_input_path = dir.path().join("private_inputs");
-    let mut private_input = File::create(private_input_path.clone()).unwrap();
-    writeln!(private_input, "{}", private_input_bytes).unwrap();
+    let private_input_path = std::path::Path::new("schmivitz-snark/examples/private.txt");
 
     let mut transcript = Transcript::new(b"schmivitz-snark");
     let rng = &mut thread_rng();
     let schmivitz_proof: Proof<InsecureVole> = Proof::<InsecureVole>::prove(
         &mut circuit.clone(),
-        &private_input_path,
+        private_input_path,
         &mut transcript,
         rng,
     )?;
@@ -47,31 +40,22 @@ fn main() -> Result<()> {
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    // Create a constraint system for the optimized implementation
-    let cs_optimized = ConstraintSystem::<Bn254Fr>::new_ref();
+    let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+    let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
 
-    // Build the circuit using optimized field vars
-    let circuit_optimized = build_circuit(cs_optimized.clone(), schmivitz_proof.clone());
-    println!(
-        "Optimized implementation - Number of constraints: {:?}",
-        cs_optimized.num_constraints()
-    );
-
-    // Use the optimized circuit for the SNARK proof
     let mut rng = ark_std::test_rng();
-    println!("Setting up SNARK...");
-    let (pk, vk) =
-        Groth16::<Bn254>::circuit_specific_setup(circuit_optimized.clone(), &mut rng).unwrap();
+    let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
 
     let public_input = vec![];
 
     println!("Generating SNARK proof...");
-    let snark_proof = Groth16::prove(&pk, circuit_optimized, &mut rng)?;
+    let snark_proof = Groth16::prove(&pk, circuit, &mut rng)?;
     println!("Verifying SNARK proof...");
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
+    println!("Number of constraints: {:?}", cs.num_constraints());
 
     println!(
-        "Verified SNARK proof with optimized implementation: {}",
+        "Verified SNARK proof : {}",
         if is_valid { "VALID" } else { "INVALID" }
     );
 
