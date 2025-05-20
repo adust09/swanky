@@ -543,6 +543,13 @@ pub fn transpile<P: AsRef<Path>, Q: AsRef<Path>>(input_path: P, output_path: Q) 
 
 #[cfg(test)]
 mod tests {
+    use merlin::Transcript;
+    use rand::thread_rng;
+    use schmivitz::{insecure::InsecureVole, Proof};
+    use std::{fs::File, io::Cursor, path::Path};
+
+    use crate::transpiler;
+
     use super::*;
 
     #[test]
@@ -800,7 +807,7 @@ mod tests {
 
         let content = std::fs::read_to_string(output_path).expect("Failed to read output file");
 
-        std::fs::remove_file(output_path).expect("Failed to remove test output file");
+        // std::fs::remove_file(output_path).expect("Failed to remove test output file");
 
         println!("Successfully tested transpiler with Keccak_f circuit");
     }

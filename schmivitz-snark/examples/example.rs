@@ -3,7 +3,6 @@ use ark_bn254::Fr as Bn254Fr;
 use ark_groth16::Groth16;
 use ark_relations::r1cs::{ConstraintLayer, ConstraintSystem, TracingMode};
 use ark_snark::SNARK;
-use arkworks_solidity_verifier::SolidityVerifier;
 use eyre::Result;
 use merlin::Transcript;
 use rand::thread_rng;
@@ -12,7 +11,6 @@ use schmivitz_snark::build_circuit;
 use std::{
     fs::{self, File},
     io::{Cursor, Write},
-    path::Path,
 };
 use tempfile::tempdir;
 use tracing_subscriber::layer::SubscriberExt;
@@ -57,20 +55,14 @@ fn main() -> Result<()> {
     println!("num of constraints{:?}", cs.num_constraints());
 
     let mut rng = ark_std::test_rng();
+    println!("hoge");
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
-
-    let solidity_verifier = Groth16::<Bn254>::export(&vk);
-    let output_dir = Path::new("solidity_output");
-    if !output_dir.exists() {
-        fs::create_dir_all(output_dir)?;
-    }
-    let output_path = output_dir.join("vole_verifier_boolean.sol");
-    fs::write(&output_path, solidity_verifier)?;
-    println!("Solidity verifier generated at: {}", output_path.display());
 
     let public_input = vec![];
 
+    println!("hoge");
     let snark_proof = Groth16::prove(&pk, circuit, &mut rng)?;
+    println!("hoge");
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
 
     println!(

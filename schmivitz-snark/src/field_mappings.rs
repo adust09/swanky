@@ -148,6 +148,42 @@ pub fn f128b_to_boolean_array<F: Field>(
     Ok(bits)
 }
 
+pub fn f128b_to_boolean_array_public<F: Field>(
+    cs: ConstraintSystemRef<F>,
+    value: &F128b,
+) -> Result<Vec<Boolean<F>>, SynthesisError> {
+    // Get the bytes representation, handling potential missing assignments
+    let bytes = value.to_bytes();
+    let mut bits = Vec::with_capacity(128);
+
+    // Extract 128 bits from the bytes (16 bytes)
+    for byte_idx in 0..16 {
+        for bit_idx in 0..8 {
+            // Check if the byte index is valid
+            let bit = if byte_idx < bytes.len() {
+                (bytes[byte_idx] >> bit_idx) & 1 == 1
+            } else {
+                false
+            };
+
+            // Create a witness variable with proper error handling for missing assignments
+            bits.push(Boolean::new_input(
+                ark_relations::ns!(cs, "f128b_bit"),
+                || {
+                    // Check if the value is valid, otherwise return AssignmentMissing
+                    if byte_idx >= bytes.len() {
+                        Err(SynthesisError::AssignmentMissing)
+                    } else {
+                        Ok(bit)
+                    }
+                },
+            )?);
+        }
+    }
+
+    Ok(bits)
+}
+
 /// Convert an array of Boolean variables to F8b
 ///
 /// This function converts an array of Boolean variables to a value in the F8b field (GF(2^8)).

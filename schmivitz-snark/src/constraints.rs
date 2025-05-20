@@ -6,7 +6,10 @@ use ark_r1cs_std::{boolean::Boolean, prelude::*};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use schmivitz::{insecure::InsecureVole, Proof};
 
-use crate::{f128b_to_boolean_array, f8b_to_boolean_array, gadgets::ValidationVar};
+use crate::{
+    f128b_to_boolean_array, f8b_to_boolean_array, field_mappings::f128b_to_boolean_array_public,
+    gadgets::ValidationVar,
+};
 use crate::{f64b_to_boolean_array, gadgets::MaskedWitnessVar};
 
 #[derive(Debug, Clone)]
@@ -88,7 +91,7 @@ pub fn build_circuit(
     let witness_challenges_booleans: Vec<Vec<Boolean<Bn254Fr>>> = schmivitz_proof
         .witness_challenges
         .iter()
-        .map(|value| f128b_to_boolean_array(cs.clone(), value).unwrap())
+        .map(|value| f128b_to_boolean_array_public(cs.clone(), value).unwrap())
         .collect();
 
     // Convert degree commitments to boolean arrays

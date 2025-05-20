@@ -15,7 +15,6 @@ ark-groth16 = "0.3.0"
 ark-bn254 = "0.3.0"
 ark-snark = "0.3.0"
 ark-serialize = "0.3.0"
-arkworks-solidity-verifier = "0.1.0"
 # swanky
 swanky-field.workspace = true
 swanky-field-binary.workspace = true
