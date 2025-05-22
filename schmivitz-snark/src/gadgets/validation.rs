@@ -303,6 +303,29 @@ impl ValidationVar {
 
         Ok(actual_validation_var)
     }
+
+    /// Optimized version of compute_actual_validation that uses BinaryFieldVar
+    ///
+    /// This corresponds to the calculation in proof.rs line 317-318:
+    /// let actual_validation = self.degree_1_commitment * self.partial_decommitment.verifier_key()
+    ///     + self.degree_0_commitment;
+    #[tracing::instrument(
+        target = "r1cs",
+        skip(degree_0_commitment, degree_1_commitment, verifier_key)
+    )]
+    pub fn compute_actual_validation_optimized(
+        degree_0_commitment: &BinaryFieldVar<Bn254Fr, F128b>,
+        degree_1_commitment: &BinaryFieldVar<Bn254Fr, F128b>,
+        verifier_key: &BinaryFieldVar<Bn254Fr, F128b>,
+    ) -> Result<BinaryFieldVar<Bn254Fr, F128b>, SynthesisError> {
+        // Compute degree_1_commitment * verifier_key using polynomial multiplication
+        let product = Self::polynomial_multiply(degree_1_commitment, verifier_key)?;
+
+        // Add degree_0_commitment to the product (XOR for binary field addition)
+        let actual_validation = product.xor(degree_0_commitment)?;
+
+        Ok(actual_validation)
+    }
 }
 
 #[test]
