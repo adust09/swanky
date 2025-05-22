@@ -141,7 +141,7 @@ impl ValidationVar {
         let b_bits = b.to_bits_le()?;
 
         // Initialize result with zeros
-        let cs = a.value.cs();
+        let _cs = a.value.cs();
         let mut result_bits = Vec::with_capacity(128);
         for _ in 0..128 {
             result_bits.push(Boolean::constant(false));

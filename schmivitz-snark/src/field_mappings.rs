@@ -409,7 +409,7 @@ pub fn field_var_to_f128b<F: PrimeField>(
     Ok(F128b::from_uniform_bytes(&bytes))
 }
 
-pub fn f128b_to_boolean_array_public<F: Field>(
+pub fn _f128b_to_boolean_array_public<F: Field>(
     cs: ConstraintSystemRef<F>,
     value: &F128b,
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {

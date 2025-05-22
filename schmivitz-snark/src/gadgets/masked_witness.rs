@@ -150,7 +150,7 @@ impl MaskedWitnessVar {
                 };
 
                 // Convert to BinaryFieldVar
-                let bit_var = f8b_to_field_var(cs.clone(), &f8b_value)?;
+                let _bit_var = f8b_to_field_var(cs.clone(), &f8b_value)?;
 
                 // If first bit is 1, result is the key_var, otherwise it's 0
                 // We need to implement conditional selection
