@@ -26,7 +26,6 @@ fn main() -> Result<()> {
     let circuit_str = fs::read_to_string("schmivitz-snark/examples/circuit.txt")?;
     let circuit = Cursor::new(circuit_str.as_bytes());
 
-    // read private input from private.txt
     let private_input_bytes = fs::read_to_string("schmivitz-snark/examples/private.txt")?;
 
     let dir = tempdir().unwrap();
@@ -43,18 +42,14 @@ fn main() -> Result<()> {
         rng,
     )?;
 
-    // validate proof
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
         .expect("Verification should succeed");
 
-    // Create a constraint system for boolean conversions
     let cs = ConstraintSystem::<Bn254Fr>::new_ref();
-
-    // Build the circuit using boolean arrays
     let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
-    println!("num of constraints{:?}", cs.num_constraints());
+    println!("num of constraints={:?}", cs.num_constraints());
 
     let mut rng = ark_std::test_rng();
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
