@@ -409,7 +409,325 @@ pub fn field_var_to_f128b<F: PrimeField>(
     Ok(F128b::from_uniform_bytes(&bytes))
 }
 
-pub fn _f128b_to_boolean_array_public<F: Field>(
+// /// Safe version of from_bits_le for F8b that works with the constraint system
+// pub fn from_bits_le_safe_f8b<F: PrimeField>(
+//     bits: &[Boolean<F>],
+// ) -> Result<BinaryFieldVar<F, F8b>, SynthesisError> {
+//     if bits.len() < 8 {
+//         return Err(SynthesisError::Unsatisfiable);
+//     }
+
+//     // Take only the first 8 bits
+//     let bits = &bits[0..8];
+
+//     // Get the constraint system from the first bit
+//     let cs = R1CSVar::cs(&bits[0]);
+
+//     // Create a new witness variable
+//     let value = FpVar::new_witness(cs.clone(), || {
+//         let mut val = F::zero();
+//         let mut coeff = F::one();
+
+//         for bit in bits.iter() {
+//             if bit.value()? {
+//                 val += coeff;
+//             }
+//             coeff = coeff + coeff;
+//         }
+
+//         Ok(val)
+//     })?;
+
+//     Ok(BinaryFieldVar {
+//         value,
+//         _phantom: PhantomData,
+//     })
+// }
+
+// /// Safe version of from_bits_le for F64b that works with the constraint system
+// pub fn from_bits_le_safe_f64b<F: PrimeField>(
+//     bits: &[Boolean<F>],
+// ) -> Result<BinaryFieldVar<F, F64b>, SynthesisError> {
+//     if bits.len() < 64 {
+//         return Err(SynthesisError::Unsatisfiable);
+//     }
+
+//     // Take only the first 64 bits
+//     let bits = &bits[0..64];
+
+//     // Get the constraint system from the first bit
+//     let cs = R1CSVar::cs(&bits[0]);
+
+//     // Create a new witness variable
+//     let value = FpVar::new_witness(cs.clone(), || {
+//         let mut val = F::zero();
+//         let mut coeff = F::one();
+
+//         for bit in bits.iter() {
+//             if bit.value()? {
+//                 val += coeff;
+//             }
+//             coeff = coeff + coeff;
+//         }
+
+//         Ok(val)
+//     })?;
+
+//     Ok(BinaryFieldVar {
+//         value,
+//         _phantom: PhantomData,
+//     })
+// }
+
+// /// Safe version of from_bits_le for F128b that works with the constraint system
+// pub fn from_bits_le_safe_f128b<F: PrimeField>(
+//     bits: &[Boolean<F>],
+// ) -> Result<BinaryFieldVar<F, F128b>, SynthesisError> {
+//     if bits.len() != 128 {
+//         return Err(SynthesisError::Unsatisfiable);
+//     }
+
+//     // Get the constraint system from the first bit
+//     let cs = R1CSVar::cs(&bits[0]);
+
+//     // Create a new witness variable
+//     let value = FpVar::new_witness(cs.clone(), || {
+//         let mut val = F::zero();
+//         let mut coeff = F::one();
+
+//         for bit in bits.iter() {
+//             if bit.value()? {
+//                 val += coeff;
+//             }
+//             coeff = coeff + coeff;
+//         }
+
+//         Ok(val)
+//     })?;
+
+//     Ok(BinaryFieldVar {
+//         value,
+//         _phantom: PhantomData,
+//     })
+// }
+
+// /// Safe version of XOR operation for F8b that works with the constraint system
+// pub fn xor_safe_f8b<F: PrimeField>(
+//     a: &BinaryFieldVar<F, F8b>,
+//     b: &BinaryFieldVar<F, F8b>,
+// ) -> Result<BinaryFieldVar<F, F8b>, SynthesisError> {
+//     // In binary fields, addition is XOR
+//     // We need to implement this at the bit level since FpVar addition is not XOR
+//     let a_bits = a.to_bits_le()?;
+//     let b_bits = b.to_bits_le()?;
+
+//     let mut result_bits = Vec::with_capacity(8);
+//     for i in 0..8 {
+//         result_bits.push(a_bits[i].xor(&b_bits[i])?);
+//     }
+
+//     // Convert back to BinaryFieldVar using from_bits_le_safe
+//     from_bits_le_safe_f8b(&result_bits)
+// }
+
+// /// Safe version of XOR operation for F64b that works with the constraint system
+// pub fn xor_safe_f64b<F: PrimeField>(
+//     a: &BinaryFieldVar<F, F64b>,
+//     b: &BinaryFieldVar<F, F64b>,
+// ) -> Result<BinaryFieldVar<F, F64b>, SynthesisError> {
+//     // In binary fields, addition is XOR
+//     // We need to implement this at the bit level since FpVar addition is not XOR
+//     let a_bits = a.to_bits_le()?;
+//     let b_bits = b.to_bits_le()?;
+
+//     let mut result_bits = Vec::with_capacity(64);
+//     for i in 0..64 {
+//         result_bits.push(a_bits[i].xor(&b_bits[i])?);
+//     }
+
+//     // Convert back to BinaryFieldVar using from_bits_le_safe
+//     from_bits_le_safe_f64b(&result_bits)
+// }
+
+// /// Safe version of XOR operation for F128b that works with the constraint system
+// pub fn xor_safe_f128b<F: PrimeField>(
+//     a: &BinaryFieldVar<F, F128b>,
+//     b: &BinaryFieldVar<F, F128b>,
+// ) -> Result<BinaryFieldVar<F, F128b>, SynthesisError> {
+//     // In binary fields, addition is XOR
+//     // We need to implement this at the bit level since FpVar addition is not XOR
+//     let a_bits = a.to_bits_le()?;
+//     let b_bits = b.to_bits_le()?;
+
+//     let mut result_bits = Vec::with_capacity(128);
+//     for i in 0..128 {
+//         result_bits.push(a_bits[i].xor(&b_bits[i])?);
+//     }
+
+//     // Convert back to BinaryFieldVar using from_bits_le_safe
+//     from_bits_le_safe_f128b(&result_bits)
+// }
+
+/// Safe version of from_bits_le for F8b that works with the constraint system
+pub fn from_bits_le_safe_f8b<F: PrimeField>(
+    bits: &[Boolean<F>],
+) -> Result<BinaryFieldVar<F, F8b>, SynthesisError> {
+    if bits.len() < 8 {
+        return Err(SynthesisError::Unsatisfiable);
+    }
+
+    // Take only the first 8 bits
+    let bits = &bits[0..8];
+
+    // Get the constraint system from the first bit
+    let cs = R1CSVar::cs(&bits[0]);
+
+    // Create a new witness variable
+    let value = FpVar::new_witness(cs.clone(), || {
+        let mut val = F::zero();
+        let mut coeff = F::one();
+
+        for bit in bits.iter() {
+            if bit.value()? {
+                val += coeff;
+            }
+            coeff = coeff + coeff;
+        }
+
+        Ok(val)
+    })?;
+
+    Ok(BinaryFieldVar {
+        value,
+        _phantom: PhantomData,
+    })
+}
+
+/// Safe version of from_bits_le for F64b that works with the constraint system
+pub fn from_bits_le_safe_f64b<F: PrimeField>(
+    bits: &[Boolean<F>],
+) -> Result<BinaryFieldVar<F, F64b>, SynthesisError> {
+    if bits.len() < 64 {
+        return Err(SynthesisError::Unsatisfiable);
+    }
+
+    // Take only the first 64 bits
+    let bits = &bits[0..64];
+
+    // Get the constraint system from the first bit
+    let cs = R1CSVar::cs(&bits[0]);
+
+    // Create a new witness variable
+    let value = FpVar::new_witness(cs.clone(), || {
+        let mut val = F::zero();
+        let mut coeff = F::one();
+
+        for bit in bits.iter() {
+            if bit.value()? {
+                val += coeff;
+            }
+            coeff = coeff + coeff;
+        }
+
+        Ok(val)
+    })?;
+
+    Ok(BinaryFieldVar {
+        value,
+        _phantom: PhantomData,
+    })
+}
+
+/// Safe version of from_bits_le for F128b that works with the constraint system
+pub fn from_bits_le_safe_f128b<F: PrimeField>(
+    bits: &[Boolean<F>],
+) -> Result<BinaryFieldVar<F, F128b>, SynthesisError> {
+    if bits.len() != 128 {
+        return Err(SynthesisError::Unsatisfiable);
+    }
+
+    // Get the constraint system from the first bit
+    let cs = R1CSVar::cs(&bits[0]);
+
+    // Create a new witness variable
+    let value = FpVar::new_witness(cs.clone(), || {
+        let mut val = F::zero();
+        let mut coeff = F::one();
+
+        for bit in bits.iter() {
+            if bit.value()? {
+                val += coeff;
+            }
+            coeff = coeff + coeff;
+        }
+
+        Ok(val)
+    })?;
+
+    Ok(BinaryFieldVar {
+        value,
+        _phantom: PhantomData,
+    })
+}
+
+/// Safe version of XOR operation for F8b that works with the constraint system
+pub fn xor_safe_f8b<F: PrimeField>(
+    a: &BinaryFieldVar<F, F8b>,
+    b: &BinaryFieldVar<F, F8b>,
+) -> Result<BinaryFieldVar<F, F8b>, SynthesisError> {
+    // In binary fields, addition is XOR
+    // We need to implement this at the bit level since FpVar addition is not XOR
+    let a_bits = a.to_bits_le()?;
+    let b_bits = b.to_bits_le()?;
+
+    let mut result_bits = Vec::with_capacity(8);
+    for i in 0..8 {
+        result_bits.push(a_bits[i].xor(&b_bits[i])?);
+    }
+
+    // Convert back to BinaryFieldVar using from_bits_le_safe
+    from_bits_le_safe_f8b(&result_bits)
+}
+
+/// Safe version of XOR operation for F64b that works with the constraint system
+pub fn xor_safe_f64b<F: PrimeField>(
+    a: &BinaryFieldVar<F, F64b>,
+    b: &BinaryFieldVar<F, F64b>,
+) -> Result<BinaryFieldVar<F, F64b>, SynthesisError> {
+    // In binary fields, addition is XOR
+    // We need to implement this at the bit level since FpVar addition is not XOR
+    let a_bits = a.to_bits_le()?;
+    let b_bits = b.to_bits_le()?;
+
+    let mut result_bits = Vec::with_capacity(64);
+    for i in 0..64 {
+        result_bits.push(a_bits[i].xor(&b_bits[i])?);
+    }
+
+    // Convert back to BinaryFieldVar using from_bits_le_safe
+    from_bits_le_safe_f64b(&result_bits)
+}
+
+/// Safe version of XOR operation for F128b that works with the constraint system
+pub fn xor_safe_f128b<F: PrimeField>(
+    a: &BinaryFieldVar<F, F128b>,
+    b: &BinaryFieldVar<F, F128b>,
+) -> Result<BinaryFieldVar<F, F128b>, SynthesisError> {
+    // In binary fields, addition is XOR
+    // We need to implement this at the bit level since FpVar addition is not XOR
+    let a_bits = a.to_bits_le()?;
+    let b_bits = b.to_bits_le()?;
+
+    let mut result_bits = Vec::with_capacity(128);
+    for i in 0..128 {
+        result_bits.push(a_bits[i].xor(&b_bits[i])?);
+    }
+
+    // Convert back to BinaryFieldVar using from_bits_le_safe
+    from_bits_le_safe_f128b(&result_bits)
+}
+
+pub fn f128b_to_boolean_array_public<F: Field>(
     cs: ConstraintSystemRef<F>,
     value: &F128b,
 ) -> Result<Vec<Boolean<F>>, SynthesisError> {

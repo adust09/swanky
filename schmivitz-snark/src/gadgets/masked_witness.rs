@@ -1,11 +1,14 @@
 use ark_bn254::Fr as Bn254Fr;
-use ark_r1cs_std::{boolean::Boolean, R1CSVar};
+use ark_r1cs_std::boolean::Boolean;
+use ark_r1cs_std::R1CSVar;
 use ark_relations::r1cs::SynthesisError;
 use schmivitz::parameters::REPETITION_PARAM;
 use swanky_field::FiniteRing;
 use swanky_field_binary::{F128b, F64b, F8b};
 
-use crate::field_mappings::{f8b_to_field_var, BinaryFieldVar};
+use crate::field_mappings::{
+    f8b_to_field_var, from_bits_le_safe_f128b, from_bits_le_safe_f8b, xor_safe_f8b, BinaryFieldVar,
+};
 
 pub struct MaskedWitnessVar;
 
@@ -87,12 +90,10 @@ impl MaskedWitnessVar {
         // Initialize the result vector
         let mut d_delta = Vec::with_capacity(witness_commitment_vars.len());
 
-        // Extract the verifier key as an array of F8b BinaryFieldVars
-        // First, convert to bits
+        // Extract the verifier key as Boolean array
         let verifier_key_bits = verifier_key_var.to_bits_le()?;
 
-        // Reconstruct the verifier key array structure
-        // Each F8b value is represented by 8 bits
+        // Reconstruct the verifier key array structure as BinaryFieldVar<F, F8b>
         let mut verifier_key_array = Vec::with_capacity(REPETITION_PARAM);
         for i in 0..REPETITION_PARAM {
             if i * 8 + 7 >= verifier_key_bits.len() {
@@ -104,22 +105,8 @@ impl MaskedWitnessVar {
             let end_idx = start_idx + 8;
             let key_bits = verifier_key_bits[start_idx..end_idx].to_vec();
 
-            // Create a constraint system reference from the first bit
-            let cs = key_bits[0].cs();
-
-            // Convert bits to bytes
-            let mut byte = 0u8;
-            for (j, bit) in key_bits.iter().enumerate() {
-                if bit.value()? {
-                    byte |= 1 << j;
-                }
-            }
-
-            // Create F8b value and convert to BinaryFieldVar
-            let f8b_value =
-                F8b::from_uniform_bytes(&[byte, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-            let key_var = f8b_to_field_var(cs, &f8b_value)?;
-
+            // Convert bits to BinaryFieldVar using from_bits_le_safe_f8b
+            let key_var = from_bits_le_safe_f8b(&key_bits)?;
             verifier_key_array.push(key_var);
         }
 
@@ -137,45 +124,21 @@ impl MaskedWitnessVar {
                 Boolean::constant(false)
             };
 
-            // Get the constraint system from the first bit
-            let cs = first_bit.cs();
-
             // For each F8b value in the verifier key array
             for key_var in &verifier_key_array {
-                // Create F8b value based on the first bit (either F8b::ONE or F8b::ZERO)
-                let f8b_value = if first_bit.value()? {
-                    F8b::ONE
-                } else {
-                    F8b::ZERO
-                };
-
-                // Convert to BinaryFieldVar
-                let _bit_var = f8b_to_field_var(cs.clone(), &f8b_value)?;
-
-                // If first bit is 1, result is the key_var, otherwise it's 0
-                // We need to implement conditional selection
-                // For now, we'll convert to bits, perform the operation, and convert back
+                // If first_bit is 1, result is key_var, otherwise it's 0
+                // Convert key_var to bits
                 let key_bits = key_var.to_bits_le()?;
                 let mut result_bits = Vec::with_capacity(key_bits.len());
 
+                // For each bit in key_var, AND it with first_bit
                 for key_bit in key_bits {
-                    // Multiply (AND) the first bit with each bit of the key
                     let result_bit = Boolean::and(&first_bit, &key_bit)?;
                     result_bits.push(result_bit);
                 }
 
-                // Convert back to BinaryFieldVar
-                let mut byte = 0u8;
-                for (j, bit) in result_bits.iter().enumerate() {
-                    if bit.value()? {
-                        byte |= 1 << j;
-                    }
-                }
-
-                // Create F8b value and convert to BinaryFieldVar
-                let f8b_result =
-                    F8b::from_uniform_bytes(&[byte, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-                let result_var = f8b_to_field_var(cs.clone(), &f8b_result)?;
+                // Convert result_bits back to BinaryFieldVar using from_bits_le_safe_f8b
+                let result_var = from_bits_le_safe_f8b(&result_bits)?;
 
                 delta_array.push(result_var);
             }
@@ -309,8 +272,8 @@ impl MaskedWitnessVar {
             // In binary fields, addition is XOR
             for j in 0..REPETITION_PARAM {
                 if j < witness_vole.len() && j < d_delta_array.len() {
-                    // XOR the witness vole with the corresponding d_delta
-                    let sum_var = witness_vole[j].xor(&d_delta_array[j])?;
+                    // XOR the witness vole with the corresponding d_delta using xor_safe_f8b
+                    let sum_var = xor_safe_f8b(&witness_vole[j], &d_delta_array[j])?;
                     masked_witness_array.push(sum_var);
                 } else if j < d_delta_array.len() {
                     // If witness_vole is shorter than d_delta, just use the d_delta value
@@ -325,14 +288,14 @@ impl MaskedWitnessVar {
             // to an F128b value. We need to simulate this operation with BinaryFieldVar.
 
             // Get the constraint system from the first element
-            let cs = if !masked_witness_array.is_empty() {
+            let _cs = if !masked_witness_array.is_empty() {
                 masked_witness_array[0].value.cs()
             } else {
                 // If the array is empty, we can't proceed
                 return Err(SynthesisError::Unsatisfiable);
             };
 
-            // Convert each F8b to bits
+            // Convert each F8b to bits and combine them into a 128-bit array
             let mut all_bits = Vec::with_capacity(128);
 
             // Fill with zeros initially
@@ -359,24 +322,8 @@ impl MaskedWitnessVar {
                 }
             }
 
-            // Convert the 128 bits to a F128b BinaryFieldVar
-            // First, convert bits to bytes
-            let mut bytes = [0u8; 16]; // 128 bits = 16 bytes
-            for byte_idx in 0..16 {
-                for bit_idx in 0..8 {
-                    let bit_pos = byte_idx * 8 + bit_idx;
-                    if bit_pos < all_bits.len() && all_bits[bit_pos].value()? {
-                        bytes[byte_idx] |= 1 << bit_idx;
-                    }
-                }
-            }
-
-            // Create F128b value
-            let f128b_value = F128b::from_uniform_bytes(&bytes);
-
-            // Convert to BinaryFieldVar
-            let superfield_var =
-                BinaryFieldVar::<Bn254Fr, F128b>::new_witness(cs, || Ok(f128b_value))?;
+            // Convert the 128 bits to a F128b BinaryFieldVar using from_bits_le_safe_f128b
+            let superfield_var = from_bits_le_safe_f128b(&all_bits)?;
 
             masked_witnesses.push(superfield_var);
         }
@@ -388,6 +335,8 @@ impl MaskedWitnessVar {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::field_mappings::{f128b_to_field_var, f64b_to_field_var};
+    use ark_relations::r1cs::ConstraintSystem;
 
     #[test]
     fn test_compute_d_delta() {
@@ -398,7 +347,10 @@ mod tests {
         ];
 
         // Create test verifier key booleans
-        let verifier_key_booleans = vec![Boolean::constant(true), Boolean::constant(true)];
+        let mut verifier_key_booleans = Vec::new();
+        for _ in 0..REPETITION_PARAM * 8 {
+            verifier_key_booleans.push(Boolean::constant(true));
+        }
 
         // Compute d_delta
         let d_delta =
@@ -432,5 +384,120 @@ mod tests {
 
         // Verify the result
         assert_eq!(masked_witnesses.len(), 1);
+    }
+
+    #[test]
+    fn test_compute_d_delta_optimized() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Create test witness commitment values
+        let f64b_1 = F64b::from_uniform_bytes(&[0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let f64b_2 = F64b::from_uniform_bytes(&[0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        // Create test verifier key value
+        let f128b =
+            F128b::from_uniform_bytes(&[0x0F, 0x0F, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        // Convert to BinaryFieldVar
+        let witness_commitment_vars = vec![
+            f64b_to_field_var(cs.clone(), &f64b_1).unwrap(),
+            f64b_to_field_var(cs.clone(), &f64b_2).unwrap(),
+        ];
+        let verifier_key_var = f128b_to_field_var(cs.clone(), &f128b).unwrap();
+
+        // Compute d_delta using the optimized method
+        let d_delta_optimized = MaskedWitnessVar::compute_d_delta_optimized(
+            &witness_commitment_vars,
+            &verifier_key_var,
+        )
+        .unwrap();
+
+        // Verify the result
+        assert_eq!(d_delta_optimized.len(), 2);
+
+        // Convert the first witness commitment to boolean array
+        let commitment_bits = witness_commitment_vars[0].to_bits_le().unwrap();
+        let first_bit = commitment_bits[0].clone();
+
+        // Convert the first element of d_delta_optimized to boolean array
+        let result_bits = d_delta_optimized[0][0].to_bits_le().unwrap();
+
+        // Check if the computation is correct
+        // If the first bit of the commitment is 1, the result should not be all zeros
+        // If the first bit of the commitment is 0, the result should be all zeros
+        if first_bit.value().unwrap() {
+            // The first bit is 1, so the result should not be all zeros
+            assert!(result_bits.iter().any(|bit| bit.value().unwrap()));
+        } else {
+            // The first bit is 0, so the result should be all zeros
+            assert!(result_bits.iter().all(|bit| !bit.value().unwrap()));
+        }
+    }
+
+    #[test]
+    fn test_compute_masked_witness_optimized() {
+        // Create a constraint system
+        let cs = ConstraintSystem::<Bn254Fr>::new_ref();
+
+        // Create test witness voles values
+        let f8b_1 = F8b::from_uniform_bytes(&[0x0A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let f8b_2 = F8b::from_uniform_bytes(&[0x0B, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        // Create test d_delta values
+        let f8b_3 = F8b::from_uniform_bytes(&[0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let f8b_4 = F8b::from_uniform_bytes(&[0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+        // Convert to BinaryFieldVar
+        let witness_voles_vars = vec![vec![
+            f8b_to_field_var(cs.clone(), &f8b_1).unwrap(),
+            f8b_to_field_var(cs.clone(), &f8b_2).unwrap(),
+        ]];
+
+        let d_delta_vars = vec![vec![
+            f8b_to_field_var(cs.clone(), &f8b_3).unwrap(),
+            f8b_to_field_var(cs.clone(), &f8b_4).unwrap(),
+        ]];
+
+        // Compute masked witnesses using the optimized method
+        let masked_witnesses_optimized =
+            MaskedWitnessVar::compute_masked_witness_optimized(&witness_voles_vars, &d_delta_vars)
+                .unwrap();
+
+        // Verify the result
+        assert_eq!(masked_witnesses_optimized.len(), 1);
+
+        // Convert to bits to check the computation
+        let masked_witness_bits = masked_witnesses_optimized[0].to_bits_le().unwrap();
+
+        // The first 8 bits should be the XOR of f8b_1 and f8b_3
+        // The expected result is 0x0A ^ 0x05 = 0x0F
+        let expected_first_byte = 0x0F;
+
+        // Convert the first 8 bits of masked_witness_bits to a byte
+        let mut first_byte = 0u8;
+        for i in 0..8 {
+            if masked_witness_bits[i].value().unwrap() {
+                first_byte |= 1 << i;
+            }
+        }
+
+        // Check if the computation is correct
+        assert_eq!(first_byte, expected_first_byte);
+
+        // The second 8 bits should be the XOR of f8b_2 and f8b_4
+        // The expected result is 0x0B ^ 0x06 = 0x0D
+        let expected_second_byte = 0x0D;
+
+        // Convert the second 8 bits of masked_witness_bits to a byte
+        let mut second_byte = 0u8;
+        for i in 0..8 {
+            if masked_witness_bits[8 + i].value().unwrap() {
+                second_byte |= 1 << i;
+            }
+        }
+
+        // Check if the computation is correct
+        assert_eq!(second_byte, expected_second_byte);
     }
 }

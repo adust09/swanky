@@ -44,7 +44,11 @@ fn main() -> Result<()> {
     let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
 
     let mut rng = ark_std::test_rng();
+
     let (pk, vk) = Groth16::<Bn254>::circuit_specific_setup(circuit.clone(), &mut rng).unwrap();
+    println!("num_constraints: {:?}", cs.num_constraints());
+    println!("num_instance_variables: {:?}", cs.num_instance_variables());
+    println!("num_witness_variables: {:?}", cs.num_witness_variables());
 
     let public_input = vec![];
 
@@ -52,7 +56,6 @@ fn main() -> Result<()> {
     let snark_proof = Groth16::prove(&pk, circuit, &mut rng)?;
     println!("Verifying SNARK proof...");
     let is_valid = Groth16::verify(&vk, &public_input, &snark_proof)?;
-    println!("Number of constraints: {:?}", cs.num_constraints());
 
     println!(
         "Verified SNARK proof : {}",
