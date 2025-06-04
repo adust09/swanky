@@ -34,7 +34,6 @@ fn main() -> Result<()> {
         rng,
     )?;
 
-    // validate proof
     let mut test_verify_transcript = Transcript::new(b"schmivitz-snark");
     schmivitz_proof
         .verify(&mut circuit.clone(), &mut test_verify_transcript)
@@ -42,6 +41,8 @@ fn main() -> Result<()> {
 
     let cs = ConstraintSystem::<Bn254Fr>::new_ref();
     let circuit = build_circuit(cs.clone(), schmivitz_proof.clone());
+
+    println!("num of constraints={:?}", cs.num_constraints());
 
     let mut rng = ark_std::test_rng();
 
